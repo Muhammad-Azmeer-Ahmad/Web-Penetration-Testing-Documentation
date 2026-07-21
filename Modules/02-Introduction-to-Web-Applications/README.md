@@ -97,6 +97,7 @@ No server management needed — cloud handles it all.
 - If you breach a server and can not find the database — it is
   probably on a separate server. Keep enumerating.
 
+<<<<<<< HEAD
 ---
 
 ## Front End vs Back End
@@ -202,5 +203,7 @@ manipulate any element via the DOM.
 Useful for XSS — we can inject JS that reads, modifies, or
 creates DOM elements to steal data or hijack sessions.
 
+=======
+>>>>>>> 7be55426794e3a3164b786ebabb29ceeaab9a089
 ## Status
 🔄 In progress — updating as I complete each section
