@@ -1,5 +1,9 @@
 # Module 01 — Web Requests
 
+![Status](https://img.shields.io/badge/Status-Completed-yellow)
+![Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
+![Category](https://img.shields.io/badge/Category-General-blue)
+
 ## What This Module Is About
 HTTP is the protocol that powers all web communication. A client
 sends a request to a server, the server processes it and returns
