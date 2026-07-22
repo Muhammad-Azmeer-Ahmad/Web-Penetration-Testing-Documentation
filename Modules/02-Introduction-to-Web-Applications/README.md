@@ -4,11 +4,6 @@
 ![Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
 ![Category](https://img.shields.io/badge/Category-General-blue)
 
-## What This Module Is About
-Understanding how web applications are built, how they differ from
-static websites, and why they are such a massive attack surface.
-Before you attack something you need to understand what it is.
-
 ## Sections Progress
 - [x] Introduction
 - [x] Web Application Layout
@@ -17,15 +12,22 @@ Before you attack something you need to understand what it is.
 - [x] CSS
 - [x] JavaScript
 - [x] Sensitive Data Exposure
-- [ ] HTML Injection
-- [ ] Cross-Site Scripting XSS
-- [ ] Cross-Site Request Forgery CSRF
+- [x] HTML Injection
+- [x] Cross-Site Scripting XSS
+- [x] Cross-Site Request Forgery CSRF
 - [ ] Back End Servers
 - [ ] Web Servers
 - [ ] Databases
 - [ ] Development Frameworks and APIs
 - [ ] Common Web Vulnerabilities
 - [ ] Public Vulnerabilities
+
+---
+
+## What This Module Is About
+Understanding how web applications are built, how they differ from
+static websites, and why they are such a massive attack surface.
+Before you attack something you need to understand what it is.
 
 ---
 
@@ -89,8 +91,8 @@ Before you attack something you need to understand what it is.
 
 ### Microservices
 App broken into independent components each doing one job —
-payments, search, ratings etc. Stateless communication between
-them. Can be written in different languages and still interact.
+payments, search, ratings etc. Stateless between them.
+Can be written in different languages and still interact.
 
 ### Serverless
 Runs in cloud containers like Docker on AWS, GCP, Azure.
@@ -122,8 +124,7 @@ Runs on the server. Everything the user never sees.
 ### Security Angle
 - Front end = Whitebox — source code readable directly in browser
 - Back end = Blackbox — hidden on server by default
-- LFI vulnerabilities can leak back end source → turns blackbox
-  into whitebox mid-engagement
+- LFI can leak back end source → turns blackbox into whitebox
 
 ---
 
@@ -161,7 +162,6 @@ Runs on the server. Everything the user never sees.
 ## HTML
 
 Skeleton of every web page. Browser reads and renders it visually.
-Structure is a tree called the DOM.
 
 ```html
 <!DOCTYPE html>
@@ -184,8 +184,6 @@ Structure is a tree called the DOM.
 | `<script>` | JavaScript lives here |
 
 ### URL Encoding
-Browsers only support ASCII in URLs. Everything else gets
-percent-encoded — replaced with `%XX`.
 
 | Character | Encoded |
 |-----------|---------|
@@ -201,9 +199,8 @@ encoding to bypass filters or get correctly parsed by the server.
 ### DOM — Document Object Model
 Every HTML element is a node in the DOM tree. JavaScript can
 read, modify, or create any element via the DOM.
-
-XSS relevance — injected JS manipulates the DOM to steal
-cookies, redirect users, or modify page content silently.
+XSS injects JS that manipulates the DOM to steal cookies,
+redirect users, or modify page content silently.
 
 ---
 
@@ -212,32 +209,14 @@ cookies, redirect users, or modify page content silently.
 Defines how HTML elements look — colors, fonts, sizes, layout.
 
 ```css
-body {
-  background-color: black;
-}
-
-h1 {
-  color: white;
-  text-align: center;
-}
-
-p {
-  font-family: helvetica;
-  font-size: 10px;
-}
+body { background-color: black; }
+h1 { color: white; text-align: center; }
+p { font-family: helvetica; font-size: 10px; }
 ```
 
-- Targets elements by tag name, ID, or class name
-- Supports advanced animations — moving elements, 3D effects
-- Combined with JavaScript for dynamic real-time style changes
-
-### Common CSS Frameworks
-Bootstrap, SASS, Foundation, Bulma, Pure
-
-### Pentesting Relevance
-Helps when reading page source — element IDs and class names
-referenced in JavaScript and back end code reveal application
-structure and potential injection points.
+- Targets elements by tag, ID, or class name
+- Combined with JS for dynamic real-time style changes
+- Frameworks: Bootstrap, SASS, Foundation, Bulma, Pure
 
 ---
 
@@ -246,43 +225,32 @@ structure and potential injection points.
 Controls all front end functionality. Without it a page is static.
 
 ```html
-<!-- Inline -->
 <script type="text/javascript">
   document.getElementById("button1").innerHTML = "Changed Text!";
 </script>
-
-<!-- External file -->
 <script src="./script.js"></script>
 ```
 
 ### What JavaScript Does
 - Updates page content in real-time without reloading
-- Handles user input and form interaction
 - Sends and receives data from back end via Ajax
 - Runs entirely in browser — no server round trip needed
-- Drives animations that CSS alone cannot achieve
-
-### Common JS Frameworks
-Angular, React, Vue, jQuery
 
 ### Pentesting Relevance
-- JS source files often contain API endpoints, hidden parameters,
-  and hardcoded secrets — always check all loaded JS files
+- JS files often contain API endpoints, hidden parameters,
+  hardcoded secrets — always check all loaded JS files
 - Ajax requests expose back end endpoints not visible in the UI
-- DOM-based XSS lives entirely in JS — runs in victim browser
-  without ever touching the server
-- Obfuscated JS is common on real targets — covered in
-  Module 06 JavaScript Deobfuscation
+- DOM-based XSS runs in victim browser without touching server
+- Obfuscated JS is common — covered in Module 06
 
 ---
 
 ## Sensitive Data Exposure
 
-Front end code runs on the client side — anyone can read it.
-Developers often leave sensitive information in page source
-by accident.
+Front end code runs client side — anyone can read it.
+Developers often leave sensitive information in page source.
 
-### What to Look For in Page Source
+### What to Look For
 - Hardcoded credentials in HTML comments
 - Hidden links and directories
 - Debug parameters left behind
