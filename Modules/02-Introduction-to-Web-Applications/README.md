@@ -223,3 +223,21 @@ h1 {
 
 p {
   font-family: helvetica;
+
+
+---
+
+## Sensitive Data Exposure
+
+Front end code runs on the client side — meaning anyone can read
+it. Developers often leave sensitive information in page source
+by accident.
+
+### What to Look For in Page Source
+- Hardcoded credentials in HTML comments
+- Hidden links and directories
+- Debug parameters left behind
+- API keys or tokens in JS files
+- Test pages never removed from production
+
+### How to View Page Source
