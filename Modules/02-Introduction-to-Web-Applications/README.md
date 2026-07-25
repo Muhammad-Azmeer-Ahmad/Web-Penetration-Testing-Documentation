@@ -257,4 +257,42 @@ Developers often leave sensitive information in page source.
 - API keys or tokens in JS files
 - Test pages never removed from production
 
-### How to View Page Source
+---
+
+## Back End Servers
+
+The hardware and OS that hosts everything needed to run the web
+application. All processing happens here — users never see it.
+
+### Back End Contains These Three Components
+- Web Server
+- Database
+- Development Framework
+
+### Common Back End Stacks
+
+| Stack | Components |
+|-------|-----------|
+| LAMP | Linux, Apache, MySQL, PHP |
+| WAMP | Windows, Apache, MySQL, PHP |
+| WINS | Windows, IIS, .NET, SQL Server |
+| MAMP | macOS, Apache, MySQL, PHP |
+| XAMPP | Cross-Platform, Apache, MySQL, PHP/PERL |
+
+### Other Software on Back End
+Hypervisors, containers like Docker, WAFs
+
+### Hardware
+Power and performance of the hardware determines how stable
+and responsive the web app is. Large applications distribute
+load across many back end servers working together.
+Web apps can also run on cloud hosting or data centers using
+virtual hosts instead of physical servers.
+
+### Pentesting Relevance
+- Identifying the stack tells you what vulnerabilities to test
+- LAMP stack → test for PHP vulns, MySQL injection
+- IIS + .NET → test for ASP.NET specific vulnerabilities
+- WAF presence → need to test for bypass techniques
+- Containers and virtual hosts → lateral movement possibilities
+  if one container is compromised
