@@ -296,3 +296,84 @@ virtual hosts instead of physical servers.
 - WAF presence → need to test for bypass techniques
 - Containers and virtual hosts → lateral movement possibilities
   if one container is compromised
+
+
+---
+
+## Web Servers
+
+Application running on the back end that handles all HTTP traffic.
+Routes client requests to the right pages and returns responses.
+Runs on port **80** (HTTP) or **443** (HTTPS).
+
+### HTTP Response Codes — Pentester's Reference
+
+| Code | Meaning | Pentesting Use |
+|------|---------|---------------|
+| 200 | OK — request succeeded | Page exists, keep enumerating |
+| 301 | Moved Permanently | Note new URL, update target |
+| 302 | Found — temporary redirect | Common after login, check where it goes |
+| 400 | Bad Request | Malformed request — useful for fuzzing |
+| 401 | Unauthorized | Auth required — try default creds |
+| 403 | Forbidden | Page exists but blocked — try bypass techniques |
+| 404 | Not Found | Page does not exist |
+| 405 | Method Not Allowed | Try different HTTP methods |
+| 500 | Internal Server Error | Something broke — possible injection point |
+| 502 | Bad Gateway | Upstream server error — note the stack |
+
+> 403 does not mean unreachable — it means the page EXISTS.
+> Always attempt bypass: path traversal, header manipulation,
+> verb tampering. A 403 is more useful than a 404.
+
+### Checking Server Response With cURL
+
+```bash
+# View response headers only — reveals server type and version
+curl -I https://target.com
+
+# Full response — source code of the page
+curl https://target.com
+```
+
+Header fingerprinting reveals the web server type and sometimes
+version — critical for finding known CVEs.
+
+### Web Server Comparison
+
+| Server | Market Share | Best For | Used By |
+|--------|-------------|----------|---------|
+| Apache | ~40% | PHP apps, shared hosting | Apple, Adobe, Baidu |
+| NGINX | ~30% | High traffic, concurrent requests | Google, Netflix, HackTheBox |
+| IIS | ~15% | .NET apps, Active Directory environments | Microsoft, Dell, Stack Overflow |
+
+### Apache
+- Most common web server on the internet
+- Default on most Linux distributions
+- Supports PHP, .NET, Python, Perl, Bash via CGI
+- Open source — vulnerabilities are publicly disclosed
+- Common in startups and smaller companies
+
+### NGINX
+- Async architecture — handles massive concurrent requests
+- Low memory and CPU usage compared to Apache
+- Most popular among top 100,000 high traffic websites
+- Open source — same security transparency as Apache
+
+### IIS
+- Microsoft only — runs on Windows Server
+- Deeply integrated with Active Directory
+- Windows Auth = users auto sign in with AD credentials
+- If target uses IIS — assume AD is in the environment
+- Attack path: IIS vuln → Windows Server → Active Directory
+
+### Other Web Servers
+- **Apache Tomcat** — Java web applications
+- **Node.JS** — JavaScript back end applications
+
+### Pentesting Relevance
+- Identify web server from response headers before anything else
+- Apache → look for PHP vulns, .htaccess misconfigurations
+- NGINX → look for misconfigurations in proxy settings
+- IIS → always test for Active Directory attack paths
+- 500 errors during fuzzing = you hit something — investigate
+- Version in headers → search for public CVEs immediately
