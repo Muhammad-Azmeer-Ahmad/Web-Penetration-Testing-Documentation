@@ -377,3 +377,62 @@ version — critical for finding known CVEs.
 - IIS → always test for Active Directory attack paths
 - 500 errors during fuzzing = you hit something — investigate
 - Version in headers → search for public CVEs immediately
+
+---
+
+## Databases
+
+Web apps use databases to store assets, content, and user data.
+Choosing the right database depends on speed, size, scalability,
+and cost.
+
+### Relational (SQL)
+Stores data in tables, rows, and columns with defined relationships.
+Tables link to each other via keys — called a Schema.
+Fast and reliable for large structured datasets.
+
+| Database | Notes |
+|----------|-------|
+| MySQL | Most common, open source, free |
+| MSSQL | Microsoft, pairs with IIS and Windows Server |
+| Oracle | Enterprise grade, expensive, very reliable |
+| PostgreSQL | Open source, highly extensible |
+
+### Non-Relational (NoSQL)
+No tables, rows, or schemas. Flexible and scalable.
+Best for unstructured or rapidly changing data.
+
+| Model | How It Stores Data |
+|-------|--------------------|
+| Key-Value | JSON/XML pairs — key maps to a value |
+| Document-Based | Complex JSON objects with metadata |
+| Wide-Column | Column-focused, good for analytics |
+| Graph | Nodes and edges — relationships between data |
+
+| Database | Notes |
+|----------|-------|
+| MongoDB | Most common NoSQL, document-based, free |
+| ElasticSearch | Optimized for fast search on huge datasets |
+| Apache Cassandra | Scalable, handles faults gracefully |
+
+### How Web Apps Use Databases
+
+```php
+// Connect to database
+$conn = new mysqli("localhost", "user", "pass", "database1");
+
+// Query using user input — VULNERABLE to SQLi
+$searchInput = $_POST['findUser'];
+$query = "select * from users where name like '%$searchInput%'";
+$result = $conn->query($query);
+```
+
+User input goes directly into the query — no sanitization.
+This is exactly how SQL Injection happens.
+
+### Pentesting Relevance
+- MySQL + PHP = test every input field for SQLi
+- MSSQL + IIS = xp_cmdshell may be enabled → OS command execution
+- MongoDB = test for NoSQL injection — different syntax, same concept
+- ElasticSearch = often exposed without auth on internal networks
+- Any raw user input in a query = potential injection point
