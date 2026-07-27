@@ -436,3 +436,63 @@ This is exactly how SQL Injection happens.
 - MongoDB = test for NoSQL injection — different syntax, same concept
 - ElasticSearch = often exposed without auth on internal networks
 - Any raw user input in a query = potential injection point
+
+
+---
+
+## Development Frameworks and APIs
+
+### Web Frameworks
+Pre-built libraries handling common functionality — auth,
+routing, database connections — so developers build faster.
+
+| Framework | Language | Used By |
+|-----------|----------|---------|
+| Laravel | PHP | Startups, smaller companies |
+| Express | Node.JS | PayPal, Uber, IBM, Yahoo |
+| Django | Python | Google, YouTube, Instagram |
+| Rails | Ruby | GitHub, Twitch, Airbnb |
+
+Framework identification reveals known CVEs, default
+misconfigurations, and predictable directory structures.
+
+### Query Parameters
+Two ways user input reaches the back end:
+
+```http
+GET  → /search.php?item=apples
+POST → /search.php  body: item=apples
+```
+
+Every parameter is a potential injection point.
+Test GET, POST, and all hidden fields.
+
+### APIs
+Interface allowing front end to request actions from back end.
+Accessed over HTTP, returns structured data.
+
+### SOAP vs REST
+
+| | SOAP | REST |
+|-|------|------|
+| Format | XML | JSON |
+| Structure | Strict, verbose | Flexible, lightweight |
+| Use Case | Complex data, stateful objects | Search, filter, CRUD |
+
+### REST HTTP Methods
+
+| Method | Action |
+|--------|--------|
+| GET | Retrieve data |
+| POST | Create new data |
+| PUT | Create or replace existing |
+| DELETE | Remove data |
+
+### Pentesting Relevance
+- Framework version in headers or error pages → search CVEs
+- REST endpoints hidden in JS files → untested API surface
+- Test all four HTTP methods on every endpoint — PUT and
+  DELETE are often left unrestricted by developers
+- SOAP errors are verbose — leak internal structure and stack
+- API endpoints bypass UI validation — always test directly
+  with Burp or curl, never rely on client side restrictions
