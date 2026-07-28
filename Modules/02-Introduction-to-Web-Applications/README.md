@@ -496,3 +496,57 @@ Accessed over HTTP, returns structured data.
 - SOAP errors are verbose — leak internal structure and stack
 - API endpoints bypass UI validation — always test directly
   with Burp or curl, never rely on client side restrictions
+
+
+---
+
+## Public Vulnerabilities
+
+### Where to Search for Public Exploits
+
+| Resource | URL |
+|----------|-----|
+| Exploit DB | exploit-db.com |
+| Rapid7 DB | rapid7.com/db |
+| Vulnerability Lab | vulnerability-lab.com |
+| NVD | nvd.nist.gov |
+
+### Attack Workflow
+1. Identify web app and version — check page source, version.php,
+   error pages, response headers
+2. Search Google: `[app name] [version] exploit`
+3. Check exploit databases for public CVEs
+4. Prioritize CVEs with score 8-10 or leading to RCE
+5. Also check plugins and external components separately —
+   they have their own CVEs
+
+### CVSS Scoring
+
+| Version | Severity | Score Range |
+|---------|----------|-------------|
+| V2 | Low | 0.0 – 3.9 |
+| V2 | Medium | 4.0 – 6.9 |
+| V2 | High | 7.0 – 10.0 |
+| V3 | None | 0.0 |
+| V3 | Low | 0.1 – 3.9 |
+| V3 | Medium | 4.0 – 6.9 |
+| V3 | High | 7.0 – 8.9 |
+| V3 | Critical | 9.0 – 10.0 |
+
+CVSS V3 added Critical as a separate tier — V2 capped at High.
+Always note which version a score is reported in.
+
+### Back End Component Vulnerabilities
+- Web server vulns = highest priority, directly exposed externally
+- Example: ShellShock — Apache pre-2014, RCE via HTTP headers
+- DB and OS vulns = usually exploited after initial access
+- Used to escalate privileges or pivot to other internal servers
+- Still need patching even if not directly externally exploitable
+
+### Pentesting Relevance
+- Version identification is step one on every engagement
+- A known CVE on an unpatched app = direct path to RCE
+- Always check third party plugins — they are often the weak link
+- CVSS score guides your report severity rating — use V3
+- Base score only — adjust with Temporal and Environmental
+  metrics when writing client reports for accurate risk rating
