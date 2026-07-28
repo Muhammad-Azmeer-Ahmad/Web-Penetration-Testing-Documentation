@@ -1,4 +1,4 @@
-# \# Module 03 — Using Web Proxies
+# \## Module 03 — Using Web Proxies
 
 # 
 
@@ -6,11 +6,11 @@
 
 # !\[Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
 
-# !\[Category](https://img.shields.io/badge/Category-Tools-blue)
+# !\[Category](https://img.shields.io/badge/Category-Offensive-orange)
 
 # 
 
-# \## Sections Progress
+# \### Sections Progress
 
 # \- \[x] Intro to Web Proxies
 
@@ -42,7 +42,7 @@
 
 # 
 
-# \## Intro to Web Proxies
+# \### Intro to Web Proxies
 
 # 
 
@@ -80,7 +80,7 @@
 
 # 
 
-# \## Setting Up
+# \### Setting Up
 
 # 
 
@@ -116,7 +116,7 @@
 
 # 
 
-# \## Proxy Setup
+# \### Proxy Setup
 
 # 
 
@@ -164,7 +164,7 @@
 
 # 
 
-# \## Key Takeaways
+# \### Key Takeaways
 
 # \- Proxy setup is the precondition for everything else in this module
 
