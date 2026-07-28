@@ -497,9 +497,52 @@ Accessed over HTTP, returns structured data.
 - API endpoints bypass UI validation — always test directly
   with Burp or curl, never rely on client side restrictions
 
-
 ---
 
+## Common Web Vulnerabilities
+
+### Broken Authentication and Access Control
+
+| Vulnerability | What It Means |
+|---------------|--------------|
+| Broken Authentication | Bypass login without valid credentials |
+| Broken Access Control | Access pages or features without permission |
+
+Real example — College Management System 1.2:
+
+Email field: `' or 0=0 #` and any password
+SQLi in login form → authenticated without an account.
+
+### Malicious File Upload
+App accepts uploads without validating file type.
+Upload PHP shell disguised as image → RCE on server.
+
+Real example — WordPress Responsive Thumbnail Slider 1.0:
+Double extension bypass: `shell.php.jpg` uploaded successfully.
+Metasploit module exists for this exact vulnerability.
+
+### Command Injection
+App passes user input directly into an OS command.
+Attacker appends their own command using `|` or `;`.
+
+Real example — WordPress Plainview Activity Monitor 20161228:
+ip value: `127.0.0.1 | whoami`
+Injected command ran alongside original — full OS access.
+
+### SQL Injection
+User input goes directly into SQL query without sanitization.
+
+$query = "select * from users where name like '%$searchInput%'";
+
+College Management System 1.2 — same app, also SQLi on login.
+Query always returns true → authenticated, data extracted.
+
+### Pentesting Relevance
+- Test every login form for auth bypass first
+- Every file upload — try double extension and null byte bypass
+- Every field triggering a system action — test command injection
+- Every search and filter field — test for SQLi
+- Misconfigs cause these vulns even in fully patched public apps
 ## Public Vulnerabilities
 
 ### Where to Search for Public Exploits
