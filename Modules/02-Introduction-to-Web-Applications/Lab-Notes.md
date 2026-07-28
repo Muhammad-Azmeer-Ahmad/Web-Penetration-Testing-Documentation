@@ -18,7 +18,7 @@ never removed before deployment.
 
 **Result:** Logged in successfully with `admin:HiddenInPlainSight`
 
-![Sensitive Data Exposure](Screenshots/sensitive_data_exposure.PNG)
+![Sensitive Data Exposure](Screenshots/sensitive%20data%20exposure.PNG)
 
 **Key Observation:**
 Developers leave TODO comments in production code more often than
@@ -43,7 +43,7 @@ injected an HTML anchor tag directly into the input field.
 **Result:** The link rendered on the page as a clickable element.
 Browser treated the input as raw HTML — not plain text.
 
-![HTML Injection](Screenshots/HTML_Injection.PNG)
+![HTML Injection](Screenshots/HTML%20Injection.PNG)
 
 **Key Observation:**
 If a field renders HTML it will likely render JavaScript too.
