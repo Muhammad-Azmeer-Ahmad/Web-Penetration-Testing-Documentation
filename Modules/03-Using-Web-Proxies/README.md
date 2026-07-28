@@ -1,144 +1,174 @@
-# \# HTB Web Penetration Tester — Documentation
+# \# Module 03 — Using Web Proxies
 
 # 
 
-# Personal write-ups and notes from the Hack The Box Academy \*\*Web Penetration Tester\*\* job-role path. Documenting every module as I go — concepts, commands, lab notes, and pentesting relevance for each topic. Built as a portfolio piece and reference for real engagements.
+# !\[Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+
+# !\[Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
+
+# !\[Category](https://img.shields.io/badge/Category-Tools-blue)
 
 # 
 
-# \## Why This Repo Exists
+# \## Sections Progress
+
+# \- \[x] Intro to Web Proxies
+
+# \- \[x] Setting Up
+
+# \- \[x] Proxy Setup
+
+# \- \[ ] Site Map
+
+# \- \[ ] Repeater
+
+# \- \[ ] Intruder
+
+# \- \[ ] Decoder / Comparer
+
+# \- \[ ] Sequencer
+
+# \- \[ ] Extensions
+
+# \- \[ ] Fuzzing with Proxies
+
+# \- \[ ] Automating with Macros
+
+# \- \[ ] Skills Assessment
 
 # 
 
-# \- Track progress through the full HTB Web Penetration Tester path
-
-# \- Build a searchable personal reference of web attack techniques, tools, and payloads
-
-# \- Portfolio proof for internship / junior web pentester applications
-
-# \- Force myself to explain concepts in my own words, not just copy lab instructions
+# \---
 
 # 
 
-# \## Structure
+# \## Intro to Web Proxies
 
 # 
 
-# Each module has its own folder with a `README.md`. Inside each module README, content is broken into sections matching the HTB Academy course structure. Every section includes a \*\*Pentesting Relevance\*\* block tying the theory back to real-world testing use.
+# MITM tools that sit between browser/app and back-end server, capturing and letting you modify every HTTP/HTTPS request. Unlike Wireshark (all traffic), proxies focus on web ports (80/443).
 
 # 
 
-# ```
-
-# HTB-Web-Penetration-Tester/
-
-# ├── 01-web-requests/
-
-# │   └── README.md
-
-# ├── 02-intro-to-web-applications/
-
-# │   └── README.md
-
-# ├── 03-using-web-proxies/
-
-# │   └── README.md
-
-# ├── ...
-
-# └── README.md   (you are here)
-
-# ```
+# \*\*Uses:\*\* scanning, fuzzing, crawling, app mapping, request analysis, config testing, code review.
 
 # 
 
-# \## Modules
+# | | Burp Suite | ZAP |
+
+# |-|-----------|-----|
+
+# | Cost | Free / Paid Pro | Fully free |
+
+# | Active scanner | Pro only | Free |
+
+# | Throttling | Community limited | None |
 
 # 
 
-# | # | Module | Status |
+# \*\*Pentesting Relevance\*\*
 
-# |---|--------|--------|
+# \- Foundation tool — nearly every later technique (fuzzing, IDOR, auth bypass) routes through the proxy
 
-# | 01 | Web Requests | ✅ Complete |
+# \- Burp Community is enough for most work; Pro's scanner/Intruder speed matters at scale
 
-# | 02 | Introduction to Web Applications | ✅ Complete |
-
-# | 03 | Using Web Proxies | 🔄 In Progress |
-
-# | 04 | Information Gathering - Web Edition | ⬜ Not Started |
-
-# | 05 | Attacking Web Applications with Ffuf | ⬜ Not Started |
-
-# | 06 | Login Brute Forcing | ⬜ Not Started |
-
-# | 07 | SQL Injection Fundamentals | ⬜ Not Started |
-
-# | 08 | SQLMap Essentials | ⬜ Not Started |
-
-# | 09 | Cross-Site Scripting (XSS) | ⬜ Not Started |
-
-# | 10 | File Upload Attacks | ⬜ Not Started |
-
-# | 11 | Command Injections | ⬜ Not Started |
-
-# | 12 | File Inclusion | ⬜ Not Started |
-
-# | 13 | Server-Side Attacks | ⬜ Not Started |
-
-# | 14 | Web Attacks | ⬜ Not Started |
-
-# | 15 | Attacking Common Applications | ⬜ Not Started |
+# \- Know both — client setups won't always have your preferred tool
 
 # 
 
-# \*(Table updated as modules progress — edit as you complete each one.)\*
+# \---
 
 # 
 
-# \## Notes Format
+# \## Setting Up
 
 # 
 
-# Every module README follows the same block structure per section:
+# | Tool | Launch (installed) | Launch (JAR) |
+
+# |------|--------------------|--------------|
+
+# | Burp | `burpsuite` | `java -jar burpsuite.jar` |
+
+# | ZAP | `zaproxy` | `java -jar zap.jar` |
 
 # 
 
-# ```markdown
+# \- Burp Community → temporary project only, no save/resume
 
-# \## Section Name
+# \- Burp Pro → temp or disk-based persistent project
 
-# \[refined notes]
-
-# 
-
-# \### Pentesting Relevance
-
-# \- bullet points, direct and technical
-
-# ```
+# \- ZAP → persistent (named/timestamped) or non-persistent session
 
 # 
 
-# Lab screenshots/results get a separate \*\*Lab Notes\*\* block instead of the standard format.
+# \*\*Pentesting Relevance\*\*
+
+# \- Temp projects = default for quick engagements/labs
+
+# \- Persistent projects needed for long active scans on large scopes
+
+# \- JAR launch useful on stripped-down VMs without package managers
 
 # 
 
-# \## Tools Covered
+# \---
 
 # 
 
-# Burp Suite, ZAP, ffuf, sqlmap, and other tools get introduced as the path progresses — this list will grow.
+# \## Proxy Setup
 
 # 
 
-# \## About Me
+# \*\*Pre-configured browser (fastest):\*\* Burp → Proxy > Intercept > Open Browser. ZAP → Firefox icon in toolbar. Both come with cert + proxy already set.
 
 # 
 
-# Building toward offensive security work — web pentesting first, expanding into broader AppSec/red team skills over time. Also freelancing as a Python developer/web scraping specialist on \[Fiverr](https://fiverr.com/mazmeerahmad).
+# \*\*Manual Firefox setup:\*\*
+
+# \- Default port `8080` for both tools (configurable if in use)
+
+# \- FoxyProxy extension: IP `127.0.0.1`, Port `8080` — quick toggle instead of editing settings
 
 # 
 
-# \*\*Contact:\*\* \[GitHub](https://github.com/Muhammad-Azmeer-Ahmad)
+# \*\*CA Certificate (required for clean HTTPS interception):\*\*
+
+# 
+
+# | Tool | Get Cert |
+
+# |------|----------|
+
+# | Burp | `http://burp` → CA Certificate |
+
+# | ZAP | Tools > Options > Network > Server Certificates > Save |
+
+# 
+
+# Import in Firefox: `about:preferences#privacy` → View Certificates → Authorities → Import → trust both boxes.
+
+# 
+
+# \*\*Pentesting Relevance\*\*
+
+# \- No proxy setup = no interception = nothing else in this module works
+
+# \- Missing CA cert = #1 cause of broken/missing HTTPS traffic in labs
+
+# \- Manual Firefox config reflects real client engagements; pre-configured browser is lab-only convenience
+
+# 
+
+# \---
+
+# 
+
+# \## Key Takeaways
+
+# \- Proxy setup is the precondition for everything else in this module
+
+# \- Burp vs ZAP choice depends on budget and throttling needs, not raw capability
+
+# \- CA cert install is the step people forget and then debug for an hour
 
