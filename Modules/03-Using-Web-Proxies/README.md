@@ -9,6 +9,8 @@
 - [x] Setting Up
 - [x] Proxy Setup
 - [x] Intercepting Web Requests
+- [x] Intercepting Responses
+- [x] Automatic Modification
 - [ ] Site Map
 - [ ] Repeater
 - [ ] Intruder
@@ -192,6 +194,91 @@ Changed the body from `ip=1` to `ip=;ls;` and forwarded it. Response returned a 
 
 ---
 
+## Intercepting Responses
+
+Instead of editing the request, you can intercept the server's **response** before it reaches the browser — useful for enabling disabled fields, unhiding hidden fields, or changing how a page renders client-side restrictions.
+
+### Enabling Response Interception
+
+| Tool | How |
+|------|-----|
+| Burp | Proxy > Proxy settings > enable "Intercept Response" under Response interception rules |
+| ZAP | Step on an intercepted request auto-intercepts the matching response |
+
+### Example: Bypassing Client-Side Input Restrictions
+
+The IP field from the previous section only accepted numeric input due to `type="number"` and `maxlength="3"` in the HTML. Intercepting the response and editing it directly changes what the browser renders:
+
+```html
+<input type="text" id="ip" name="ip" min="1" max="255" maxlength="100"
+    oninput="javascript: if (this.value.length > this.maxLength) this.value = this.value.slice(0, this.maxLength);"
+    required>
+```
+
+Forwarding this modified response makes the field accept any input — including the command injection payload from Section 4 — directly through the browser instead of intercepting every request.
+
+### ZAP HUD Shortcuts
+
+| Feature | What It Does |
+|---------|---------------|
+| Show/Enable (light bulb icon) | Instantly enables disabled fields / shows hidden fields without intercepting |
+| Comments button | Flags positions in the page with HTML comments, shows content on hover |
+
+Burp has an equivalent under Proxy > Proxy settings > Response modification rules (e.g. "Unhide hidden form fields").
+
+### Pentesting Relevance
+- Response interception reveals what the app *would* let you do if the front end weren't restricting it — critical for finding features gated only by client-side JS
+- HTML comments are a common source of leftover debug info, credentials, or dead endpoints — the Comments HUD feature surfaces these fast without manually viewing source
+- Editing responses is a manual, one-off fix — doesn't persist across page reloads, which is the motivation for automatic modification (next section)
+
+---
+
+## Automatic Modification
+
+Manually intercepting every request/response gets tedious fast. Both tools support rule-based automatic modification so changes apply persistently without manual intervention each time.
+
+### Automatic Request Modification
+
+**Burp (Match and Replace)** — Proxy > Proxy settings > HTTP match and replace rules > Add:
+
+| Field | Value | Why |
+|-------|-------|-----|
+| Type | Request header | Change targets the header, not the body |
+| Match | `^User-Agent.*$` | Regex to catch the whole User-Agent line regardless of value |
+| Replace | `User-Agent: HackTheBox Agent 1.0` | New header value |
+| Regex match | True | Exact original value unknown, so pattern-match instead |
+
+**ZAP (Replacer)** — `Ctrl+R` or Options > Replacer > Add:
+
+| Field | Value |
+|-------|-------|
+| Description | HTB User-Agent |
+| Match Type | Request Header (adds if not present) |
+| Match String | User-Agent |
+| Replacement String | HackTheBox Agent 1.0 |
+| Initiators | Apply to all HTTP(S) messages (default) |
+
+### Automatic Response Modification
+
+Same concept applied to responses — makes the manual edit from the previous section persistent across refreshes instead of needing to be reapplied every time.
+
+Burp: Proxy > Options > Match and Replace, type **Response body**:
+
+| Match | Replace |
+|-------|---------|
+| `type="number"` | `type="text"` |
+| `maxlength="3"` | `maxlength="100"` |
+
+No regex needed here since the exact string is known. After adding both rules and refreshing, the field permanently accepts any input — command injection payloads work directly through the UI without touching the proxy again.
+
+### Pentesting Relevance
+- User-Agent spoofing via Match and Replace is a fast way around basic UA-based filtering/blocking
+- Persistent response rules turn a one-off bypass into a standing condition for the rest of the engagement — no repeated manual interception needed
+- This is the same principle behind bypassing client-side validation at scale: fix it once in a rule, then test freely
+- Useful pattern for engagements involving repetitive testing across many pages sharing the same restricted field
+
+---
+
 ## Key Takeaways
 - Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
 - Burp is the industry standard; ZAP is the free, unthrottled alternative
@@ -200,4 +287,6 @@ Changed the body from `ip=1` to `ip=;ls;` and forwarded it. Response returned a 
 - CA certificate installation is mandatory for clean HTTPS interception — skipping it is the most common setup mistake
 - Interception lets you bypass client-side-only validation entirely — never trust what the browser allows
 - A single unsanitized parameter passed into a system call is enough for full command injection
+- Response interception reveals hidden/disabled functionality gated only by the front end
+- Match and Replace / Replacer rules turn manual bypasses into persistent, automatic ones
 - Everything else in this module depends on proxy setup working correctly first
