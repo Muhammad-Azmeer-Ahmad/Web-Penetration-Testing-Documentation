@@ -8,6 +8,7 @@
 - [x] Intro to Web Proxies
 - [x] Setting Up
 - [x] Proxy Setup
+- [x] Intercepting Web Requests
 - [ ] Site Map
 - [ ] Repeater
 - [ ] Intruder
@@ -140,10 +141,63 @@ Without importing the CA cert, HTTPS sites either failed to load through the pro
 
 ---
 
+## Intercepting Web Requests
+
+With the proxy set up, the next step is actually intercepting and manipulating requests before they reach the server.
+
+### Turning Interception On
+
+| Tool | Default State | Toggle |
+|------|---------------|--------|
+| Burp | On by default | Proxy > Intercept > "Intercept is on/off" button |
+| ZAP | Off by default (green = passing) | Click the toggle button, or `Ctrl+B` |
+
+ZAP also has a **Heads Up Display (HUD)** — controls most ZAP features directly inside the pre-configured browser, including a dedicated interception toggle. First launch prompts a HUD tutorial; worth doing once basics are covered.
+
+Burp: `Forward` sends the request through. ZAP: `Step` sends and pauses on the next request, `Continue` forwards everything remaining uninterrupted — useful once you've isolated the one request you care about.
+
+### Manipulating Intercepted Requests
+
+Once intercepted, a request hangs until forwarded — giving a window to edit any part of it (headers, body, parameters) before it hits the server. This is the mechanism behind testing for:
+
+| Vulnerability Class | What Interception Enables |
+|---------------------|---------------------------|
+| SQL injection | Inject payloads into params bypassing front-end validation |
+| Command injection | Send OS metacharacters the UI blocks |
+| Upload bypass | Alter Content-Type / filename mid-request |
+| Auth bypass | Modify session tokens, roles, or auth headers |
+| XSS / XXE | Inject raw markup/XML the client would normally escape |
+| Error handling | Send malformed data to trigger verbose errors |
+| Deserialization | Tamper with serialized objects in the request body |
+
+### Real Example
+
+Target had an IP field restricted client-side to numbers only via front-end JS — a classic case of relying on the browser to enforce validation. Intercepted the POST request:
+
+```http
+POST /ping HTTP/1.1
+Host: 94.237.62.138:32306
+Content-Type: application/x-www-form-urlencoded
+
+ip=1
+```
+
+Changed the body from `ip=1` to `ip=;ls;` and forwarded it. Response returned a directory listing (`flag.txt`, `index.html`, `node_modules`, `package-lock.json`, `public`, `server.js`) instead of the expected ping output — confirming the back end passed the parameter straight into a shell command with zero server-side validation.
+
+### Pentesting Relevance
+- Front-end validation (JS restricting input in the browser) is not security — it's UX. Always test what the back end actually accepts, not what the form allows
+- This ip=;ls; example is a textbook OS command injection — proxy interception is what makes it testable at all
+- ZAP's HUD is worth learning early since later sections build on it for fuzzing and scanning workflows
+- Step vs Continue in ZAP mirrors a real workflow: step through unfamiliar app flows, continue once you know exactly which request matters
+
+---
+
 ## Key Takeaways
 - Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
 - Burp is the industry standard; ZAP is the free, unthrottled alternative
 - Temporary projects are fine for labs; persistent projects matter for long/large engagements
 - Two ways to proxy traffic: pre-configured browser (fast, lab-only) or manual Firefox setup (realistic, client-facing)
 - CA certificate installation is mandatory for clean HTTPS interception — skipping it is the most common setup mistake
+- Interception lets you bypass client-side-only validation entirely — never trust what the browser allows
+- A single unsanitized parameter passed into a system call is enough for full command injection
 - Everything else in this module depends on proxy setup working correctly first
