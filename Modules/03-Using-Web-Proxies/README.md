@@ -1,4 +1,4 @@
-# \## Module 03 — Using Web Proxies
+# \# Module 03 — Using Web Proxies
 
 # 
 
@@ -10,7 +10,7 @@
 
 # 
 
-# \### Sections Progress
+# \## Sections Progress
 
 # \- \[x] Intro to Web Proxies
 
@@ -42,7 +42,7 @@
 
 # 
 
-# \### What This Module Is About
+# \## What This Module Is About
 
 # How to capture, inspect, and manipulate the traffic between a browser/app and a back-end server using web proxies. Nearly every technique in the rest of the path — SQLi, XSS, fuzzing, auth bypass — depends on being able to see and modify requests first. This module is the tooling foundation everything else builds on.
 
@@ -52,7 +52,7 @@
 
 # 
 
-# \### Intro to Web Proxies
+# \## Intro to Web Proxies
 
 # 
 
@@ -60,7 +60,7 @@
 
 # 
 
-# \#### Uses Beyond Intercept/Replay
+# \### Uses Beyond Intercept/Replay
 
 # 
 
@@ -84,7 +84,7 @@
 
 # 
 
-# \#### Burp Suite vs ZAP
+# \### Burp Suite vs ZAP
 
 # 
 
@@ -104,7 +104,7 @@
 
 # 
 
-# \#### Real Impact
+# \### Real Impact
 
 # \- Burp is the industry-standard tool — most job listings and reports assume Burp familiarity
 
@@ -114,7 +114,7 @@
 
 # 
 
-# \#### Pentesting Relevance
+# \### Pentesting Relevance
 
 # \- Foundation tool — nearly every later technique (fuzzing, IDOR, auth bypass) routes through the proxy
 
@@ -128,7 +128,7 @@
 
 # 
 
-# \### Setting Up
+# \## Setting Up
 
 # 
 
@@ -150,7 +150,7 @@
 
 # 
 
-# \#### Project Types
+# \### Project Types
 
 # 
 
@@ -170,13 +170,13 @@
 
 # 
 
-# \#### Real Example
+# \### Real Example
 
 # Burp Community project setup only offers "temporary project" — no disk save option exists unless upgraded to Pro. Confirmed by walking through the setup wizard: Pro adds a second option ("New project on disk") that Community doesn't show at all.
 
 # 
 
-# \#### Pentesting Relevance
+# \### Pentesting Relevance
 
 # \- Temporary projects are the default workflow for quick engagements/labs — no state to manage or clean up
 
@@ -192,7 +192,7 @@
 
 # 
 
-# \### Proxy Setup
+# \## Proxy Setup
 
 # 
 
@@ -200,7 +200,7 @@
 
 # 
 
-# \#### 1. Pre-configured Browser (fastest)
+# \### 1. Pre-configured Browser (fastest)
 
 # \- Burp: Proxy tab > Intercept > Open Browser
 
@@ -212,7 +212,7 @@
 
 # 
 
-# \#### 2. Manual Firefox Setup
+# \### 2. Manual Firefox Setup
 
 # \- Default proxy port for both tools: `8080` (configurable if in use)
 
@@ -238,7 +238,7 @@
 
 # 
 
-# \#### CA Certificate Installation
+# \### CA Certificate Installation
 
 # 
 
@@ -260,13 +260,13 @@
 
 # 
 
-# \#### Real Example
+# \### Real Example
 
 # Without importing the CA cert, HTTPS sites either failed to load through the proxy or threw a certificate warning on every single request. After importing and trusting the cert under the Authorities tab, HTTPS traffic flowed cleanly through Burp with no interruptions.
 
 # 
 
-# \#### Pentesting Relevance
+# \### Pentesting Relevance
 
 # \- This is the actual precondition for every technique later in the module — no proxy setup, no interception, no manipulation
 
@@ -282,7 +282,7 @@
 
 # 
 
-# \### Key Takeaways
+# \## Key Takeaways
 
 # \- Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
 
