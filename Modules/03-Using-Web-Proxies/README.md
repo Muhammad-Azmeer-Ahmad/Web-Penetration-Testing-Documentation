@@ -319,6 +319,64 @@ Lab flag recovered from this exercise: `HTB{qu1ckly_r3p3471n6_r3qu3575}`
 
 ---
 
+## Encoding/Decoding
+
+Custom requests need correct encoding or the server throws errors — this section covers the built-in encoders both tools provide.
+
+### URL Encoding
+
+Key characters that must be encoded in request data:
+
+| Character | Why It Must Be Encoded |
+|-----------|--------------------------|
+| Space | May be read as end of request data |
+| `&` | Interpreted as a parameter delimiter |
+| `#` | Interpreted as a fragment identifier |
+
+| Tool | How |
+|------|-----|
+| Burp | Select text > right-click > Convert Selection > URL > URL-encode key characters, or `Ctrl+U`. Can also auto-encode as you type (right-click toggle) |
+| ZAP | Auto URL-encodes request data in the background before sending — no manual step needed |
+
+Other variants exist too — Full URL-encoding, Unicode URL-encoding — useful when a request has heavy special-character content.
+
+### Decoding
+
+Beyond URL encoding, both tools support quick conversion between common formats:
+
+| Encoding Type | Common Use |
+|----------------|-------------|
+| HTML | Escaped markup in responses |
+| Unicode | Non-ASCII characters |
+| Base64 | Tokens, cookies, serialized data |
+| ASCII hex | Raw byte-level data |
+
+| Tool | Access |
+|------|--------|
+| Burp | Decoder tab, or Burp Inspector (available inline in Proxy/Repeater) |
+| ZAP | Encoder/Decoder/Hash tool, `Ctrl+E` |
+
+### Real Example
+
+Found a cookie value: `eyJ1c2VybmFtZSI6Imd1ZXN0IiwgImlzX2FkbWluIjpmYWxzZX0=`
+
+Decoded via Burp Decoder (Decode as > Base64) revealed:
+```json
+{"username":"guest", "is_admin":false}
+```
+
+Changed `guest` → `admin` and `false` → `true`, re-encoded the modified JSON back to Base64, and swapped it into the request cookie via Repeater — a direct test for privilege escalation through client-controlled, base64-encoded state.
+
+Tip: Burp Decoder output can be chained — reapply a different encoder/decoder directly to the output pane without re-copying the text. ZAP requires copy-pasting the output back into the input field for chaining.
+
+### Pentesting Relevance
+- Any base64/hex-looking cookie or token is worth decoding immediately — client-controlled state like `is_admin` embedded in a cookie is a common and severe privilege escalation vector
+- Auto URL-encoding in ZAP vs manual in Burp matters when crafting exact payloads — know which tool is silently transforming your input
+- Chained encoding/decoding (Burp Decoder output pane) speeds up working with double-encoded or nested-format data (e.g. base64-encoded JSON, URL-encoded base64)
+- Being able to encode/decode inline in the proxy tool removes dependency on external tools (CyberChef, python one-liners) mid-engagement
+
+---
+
 ## Key Takeaways
 - Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
 - Burp is the industry standard; ZAP is the free, unthrottled alternative
@@ -330,3 +388,5 @@ Lab flag recovered from this exercise: `HTB{qu1ckly_r3p3471n6_r3qu3575}`
 - Response interception reveals hidden/disabled functionality gated only by the front end
 - Match and Replace / Replacer rules turn manual bypasses into persistent, automatic ones
 - Everything else in this module depends on proxy setup working correctly first
+- Request repeating (Burp Repeater / ZAP Request Editor) is the daily workflow for fast payload iteration — intercept once, repeat freely
+- Client-controlled state (e.g. `is_admin` in a base64 cookie) is a direct privilege escalation vector — always decode and inspect tokens/cookies
