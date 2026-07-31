@@ -377,6 +377,56 @@ Tip: Burp Decoder output can be chained — reapply a different encoder/decoder 
 
 ---
 
+## Proxying Tools
+
+Interception isn't limited to browsers — CLI tools and thick clients can be routed through the same proxy, giving full visibility into their requests too. Setup is the same as browser proxying: point the tool at `http://127.0.0.1:8080`. Method varies per tool.
+
+Note: proxying slows tools down noticeably — only enable it when actively investigating requests, not for routine use.
+
+### Proxychains
+
+Routes traffic from any CLI tool through a specified proxy. Simplest way to proxy command-line tools without per-tool configuration.
+
+**Config** — edit `/etc/proxychains.conf`, comment the last line, add:
+```
+#socks4         127.0.0.1 9050
+http 127.0.0.1 8080
+```
+
+**Usage** — the `-q` flag suppresses connection noise in the terminal:
+```bash
+proxychains -q curl http://SERVER_IP:PORT
+```
+
+The request shows up in the proxy's history exactly like browser traffic.
+
+### Metasploit
+
+Set the `PROXIES` flag before running any module:
+
+```
+msfconsole
+
+use auxiliary/scanner/http/robots_txt
+set PROXIES HTTP:127.0.0.1:8080
+set RHOST SERVER_IP
+set RPORT PORT
+run
+```
+
+Request shows up in proxy history same as any other traffic — in this case a GET to `/robots.txt` returning 404. Same method applies to any Metasploit module: scanners, exploits, everything.
+
+### Real Example
+
+Ran `auxiliary/scanner/http/http_put` through Burp with `PROXIES` set — proxy history showed the full PUT request, including its body ending in `msf test file`, confirming exactly what the module sends without needing to read Metasploit's source to find out.
+
+### Pentesting Relevance
+- Proxying CLI tools/scripts/thick clients turns a black-box tool into a fully inspectable one — essential when debugging why an exploit or scanner isn't behaving as expected
+- Proxychains is the fastest way to get arbitrary CLI tools (curl, custom scripts, etc.) through Burp/ZAP without per-tool proxy config
+- Setting `PROXIES` in Metasploit is a direct way to verify exactly what a module sends before trusting its output — useful for confirming false positives/negatives
+- Slows tools down, so this is a diagnostic step, not a permanent workflow — turn it off once the investigation is done
+
+
 ## Key Takeaways
 - Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
 - Burp is the industry standard; ZAP is the free, unthrottled alternative
