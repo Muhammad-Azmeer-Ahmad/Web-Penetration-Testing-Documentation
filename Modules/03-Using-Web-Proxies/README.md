@@ -279,6 +279,46 @@ No regex needed here since the exact string is known. After adding both rules an
 
 ---
 
+## Repeating Requests
+
+Manually intercepting, editing, and forwarding every single request to test different payloads doesn't scale — enumerating a system this way would take 5-6 steps per command. Request repeating fixes this by resending any previously captured request, editing it freely, and viewing the response without re-intercepting each time.
+
+### Proxy History
+
+| Tool | Location |
+|------|----------|
+| Burp | Proxy > HTTP History |
+| ZAP | Bottom History pane (HUD) or main UI's History tab |
+
+Both tools support filtering/sorting for large request volumes. Both also log **WebSocket history** separately — async updates and data fetching from the page after load — useful for advanced testing but out of scope here.
+
+Burp shows both the *original* and *edited* request if one was modified (toggle in the pane header). ZAP only shows the final request sent.
+
+### Repeating a Request
+
+| Tool | Workflow |
+|------|----------|
+| Burp | `Ctrl+R` sends selected request to Repeater; `Ctrl+Shift+R` jumps to the Repeater tab; click Send |
+| ZAP | Right-click request > "Open/Resend with Request Editor" > Send |
+| ZAP HUD | Click request in History pane > Request Editor opens > "Replay in Console" (response in HUD) or "Replay in Browser" (rendered response) |
+
+All three let you freely edit the request body/headers before resending, and quick-switch HTTP method (GET/POST/etc.) via a dropdown or right-click menu instead of rewriting the whole request.
+
+### Real Example
+
+Using Burp Repeater on the `/ping` endpoint from earlier sections, swapped the injected command in the body and hit Send — got the modified output back instantly, without re-intercepting. Same request reused repeatedly to iterate through different command injection payloads in seconds instead of minutes.
+
+Lab flag recovered from this exercise: `HTB{qu1ckly_r3p3471n6_r3qu3575}`
+
+### Pentesting Relevance
+- Repeater/Request Editor is the actual daily-driver workflow for iterating on injection payloads — intercept once, then repeat endlessly
+- Comparing original vs. edited requests in Burp is useful for sanity-checking exactly what was sent vs. what you intended
+- Quick HTTP method switching (GET ↔ POST) surfaces endpoints that behave differently or unexpectedly accept methods they shouldn't
+- WebSocket history matters on SPAs/modern apps where most real functionality happens over async connections, not classic page loads
+- URL-encoded request bodies are the norm — encoding/decoding payloads correctly (next section) is essential for anything beyond plain text
+
+---
+
 ## Key Takeaways
 - Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
 - Burp is the industry standard; ZAP is the free, unthrottled alternative
