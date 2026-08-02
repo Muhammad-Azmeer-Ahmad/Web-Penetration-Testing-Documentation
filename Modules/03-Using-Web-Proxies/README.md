@@ -1,6 +1,6 @@
 # Module 03 — Using Web Proxies
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
 ![Category](https://img.shields.io/badge/Category-Offensive-orange)
 
@@ -11,15 +11,14 @@
 - [x] Intercepting Web Requests
 - [x] Intercepting Responses
 - [x] Automatic Modification
-- [ ] Site Map
-- [ ] Repeater
-- [ ] Intruder
-- [ ] Decoder / Comparer
-- [ ] Sequencer
-- [ ] Extensions
-- [ ] Fuzzing with Proxies
-- [ ] Automating with Macros
-- [ ] Skills Assessment
+- [x] Repeating Requests
+- [x] Encoding/Decoding
+- [x] Proxying Tools
+- [x] Burp Intruder
+- [x] ZAP Fuzzer
+- [x] Burp Scanner
+- [x] ZAP Scanner
+- [x] Extensions
 
 ---
 
@@ -426,6 +425,223 @@ Ran `auxiliary/scanner/http/http_put` through Burp with `PROXIES` set — proxy 
 - Setting `PROXIES` in Metasploit is a direct way to verify exactly what a module sends before trusting its output — useful for confirming false positives/negatives
 - Slows tools down, so this is a diagnostic step, not a permanent workflow — turn it off once the investigation is done
 
+---
+
+## Burp Intruder
+
+Burp and ZAP both include built-in web fuzzers/scanners as alternatives to CLI tools like ffuf, dirbuster, gobuster, wfuzz. Burp's is called **Intruder** — fuzzes pages, directories, sub-domains, parameters, and parameter values.
+
+Community edition throttles Intruder to **1 request/second** (CLI fuzzers can do 10k+/sec), so it's only practical for short queries. Pro removes the throttle entirely, making it competitive with dedicated fuzzing tools while keeping Intruder's extra features.
+
+### Sending a Request to Intruder
+
+From Proxy History: right-click the target request > "Send to Intruder", or `Ctrl+I`. Jump to the Intruder tab via `Ctrl+Shift+I`. The **Target** box auto-populates from the request sent over.
+
+### Positions
+
+Marks where wordlist entries get inserted — wrap the target token in `§` markers, or select it and click "Add §". For directory fuzzing (`GET /DIRECTORY/`), existing paths return `200 OK`, missing ones `404`.
+
+Note: keep the two trailing blank lines at the end of the request or the server may return an error.
+
+### Payloads — Four Configuration Areas
+
+**1. Payload Position & Payload Type**
+
+| Payload Type | Behavior |
+|---------------|----------|
+| Simple List | Basic — iterates line by line over a provided wordlist |
+| Runtime File | Same as Simple List, but streams the file instead of loading it all into memory — better for huge wordlists |
+| Character Substitution | Tests all permutations from a defined character replacement list |
+
+Attack type (Sniper, Cluster Bomb, etc.) determines how many payload positions/sets are available.
+
+**2. Payload Configuration**
+
+Build the wordlist by adding entries manually, or Load a file — e.g. `/opt/useful/seclists/Discovery/Web-Content/common.txt`. Multiple wordlists/manual entries can be combined into one list. Burp Pro also offers built-in wordlists via "Add from list".
+
+**3. Payload Processing**
+
+Applies rules to the loaded wordlist before the attack runs — e.g. skip lines matching a regex. Example: skip all lines starting with `.`:
+```
+Rule: Skip if matches regex
+Pattern: ^\..*$
+```
+
+**4. Payload Encoding**
+
+Toggle URL-encoding for special characters (`./^=<>&+?*:;'{}|^`) — left enabled by default.
+
+### Settings
+
+| Option | Purpose |
+|--------|---------|
+| Retries on network failure / Pause before retry | Set to 0 to skip unnecessary delays |
+| Grep - Match | Flags responses matching a string/regex (e.g. `200 OK`) — enable, clear defaults, add own pattern |
+| Exclude HTTP Headers | Disable if the match string appears in headers (e.g. status line) |
+| Grep - Extract | Pulls out just a relevant part of long responses — skip if only status matters |
+| Resource Pool | Controls network resource usage for large attacks — default is fine for most cases |
+
+### Real Example
+
+Fuzzed `GET /§DIRECTORY§/` against a target using `common.txt`, with a Grep - Match rule for `200 OK` and a Payload Processing rule skipping lines starting with `.`. Results table sorted by the 200 OK column showed nearly everything as `404` (length 458) except one hit: `/admin/` returning `200` (length 244). Manually confirmed the path existed by visiting it directly.
+
+### Pentesting Relevance
+- Directory fuzzing via Intruder mirrors exactly what ffuf/gobuster do — useful when a CLI tool isn't available or when staying inside the same tool as the rest of the engagement is preferred
+- Grep - Match is the fast way to filter noise out of large wordlist runs — sort by match instead of manually scanning hundreds of results
+- Payload Processing rules (skip-if-regex) keep irrelevant wordlist entries (dotfiles, comments, headers in seclists files) from wasting requests
+- Intruder also handles password spraying against AD-backed auth (OWA, SSL VPN, RDS, Citrix, custom AD-integrated apps) — same payload-position mechanism applied to a login form instead of a URL path
+- Community's 1 req/sec throttle makes it impractical for large wordlists — know when to switch to ZAP's fuzzer or a CLI tool instead
+
+---
+
+## ZAP Fuzzer
+
+ZAP's built-in fuzzer, unlike Community Intruder, has **no throttling** — a real advantage even though it has fewer advanced features than Intruder.
+
+### Starting a Fuzz
+
+Locate the target request in History, right-click > Attack > Fuzz, which opens the Fuzzer window. Four things to configure: Fuzz Location, Payloads, Processors, Options.
+
+### Locations
+
+Same concept as Intruder's Payload Position — select the target word/token in the request and click Add. A green marker appears on the selected location.
+
+### Payloads
+
+| Payload Type | Purpose |
+|----------------|---------|
+| File | Provide a custom wordlist file |
+| File Fuzzers | Use ZAP's built-in wordlist databases (e.g. dirbuster lists) — no need to supply your own |
+| Numberzz | Generates numeric sequences with custom increments |
+
+Advantage over Intruder: built-in wordlists out of the box, expandable via the ZAP Marketplace.
+
+### Processors
+
+Applied to each payload before sending — options include Base64 Encode/Decode, MD5/SHA-1/256/512 hashing, Prefix/Postfix String, URL Encode/Decode, or a custom Script. URL Encode is the standard choice to avoid server errors from special characters — use "Generate Preview" to check the final payload before running.
+
+### Options
+
+| Setting | Purpose |
+|---------|---------|
+| Concurrent Scanning Threads | Set higher (e.g. 20) for faster scans, limited by CPU/server connection limits |
+| Depth First | Exhausts all payloads on one position before moving to the next (e.g. all passwords for one user) |
+| Breadth First | Runs one payload across all positions before moving to the next payload (e.g. one password across all users) |
+
+### Real Example
+
+Fuzzed `/test/` for directories using a dirbuster wordlist (`directory-list-1.0.txt`) with URL Encode processing applied. Sorted results by response code — got a single `200 OK` hit on the `skills` payload, confirming `/skills/` existed and was accessible. Verified by viewing the request/response details directly in the results pane.
+
+### Pentesting Relevance
+- No throttling makes ZAP Fuzzer the better default for large wordlists when Burp Pro isn't available
+- Built-in wordlists (dirbuster, FuzzDB via Marketplace) save setup time versus manually sourcing lists
+- Depth First vs Breadth First matters directly for password spraying — Breadth First avoids triggering account lockouts by not hammering one account with all passwords in a row
+- Response size (Size Resp. Body) and RTT are useful secondary signals beyond status code — e.g. spotting time-based SQLi via response delay
+
+---
+
+## Burp Scanner
+
+Burp's built-in vulnerability scanner — **Pro-only**, not available in Community. Combines a Crawler (site mapping) with Passive and Active scanning.
+
+### Target Scope
+
+Scans can start from: a specific request in Proxy History, a custom target set, or items already in scope. Scope is defined via Target > Site map (right-click > "Add to scope") or Target > Scope for advanced regex-based include/exclude rules — useful for excluding dangerous endpoints like logout functions from active scanning.
+
+### Crawler
+
+Two scan modes: **Crawl** (maps the site by following links/forms) or **Crawl and Audit** (crawl, then scan). Crawl only follows referenced links — it doesn't fuzz for unlinked pages (that's Intruder/Content Discovery's job).
+
+Scan configs can be built from scratch or picked from presets (e.g. "Crawl strategy - fastest"). Login credentials or a recorded login flow can be added so the crawler covers authenticated areas.
+
+### Passive Scanner
+
+Analyzes already-captured traffic without sending new requests — flags things like missing security headers or potential DOM-based XSS. Fast, but can only suggest — not confirm — vulnerabilities. Each finding includes a Confidence rating (Certain/Firm/Tentative) alongside severity.
+
+### Active Scanner
+
+The most thorough option — runs a crawl + fuzzer, passive scan, then actively verifies findings by sending test payloads (XSS, SQLi, command injection, etc.) and performing JS analysis. Configurable audit presets exist (e.g. "Audit checks - critical issues only" for high-value findings only).
+
+### Real Example
+
+Ran a Crawl and Audit scan with the "critical issues only" audit preset. Filtered Issue Activity results to High severity / Certain confidence and found an **OS command injection** finding on the `ip` parameter, rated High severity / Firm confidence — matching the same class of vulnerability manually found earlier in the module via interception, but discovered automatically here.
+
+### Reporting
+
+Target > Site map > right-click target > Issue > Report issues for this host. Exportable in multiple formats, includes PoC details and remediation guidance. Scanner reports are supplementary appendix material for client deliverables — never the final report on their own.
+
+### Pentesting Relevance
+- Passive scanning is a free way to catch low-hanging issues (headers, cookie flags) just from traffic already generated during normal testing
+- Active scanning automates what was done manually earlier in this module (command injection via the `ip` param) — useful for coverage, but manual testing remains necessary for anything scanner logic doesn't anticipate
+- Scope control (Add to scope / Remove from scope) is essential before running an active scan — prevents accidentally scanning out-of-scope hosts or hitting destructive endpoints like logout
+- Pro-only status makes this a budget/tooling decision point on client engagements
+
+---
+
+## ZAP Scanner
+
+ZAP's equivalent scanning suite — free, using **Spider** for site mapping and both passive and active scanning.
+
+### Spider
+
+Right-click a request in History > Attack > Spider, or use the HUD's Spider Start button. Follows and validates links similarly to Burp's Crawler. Results appear in the Sites Tree (tree view of discovered URLs/files).
+
+**Ajax Spider** — a separate spider that also identifies links loaded via JavaScript/AJAX after page load. Slower, but catches things the standard Spider misses; worth running after the normal Spider finishes.
+
+### Passive Scanner
+
+Runs automatically as the Spider crawls — flags issues like missing security headers or DOM-based XSS directly from response source, no extra requests needed. Alerts populate incrementally as pages are visited; visible per-page (left pane) or app-wide (right pane / Alerts tab).
+
+### Active Scanner
+
+Click Active Scan to run comprehensive attacks against all discovered pages/params. Auto-triggers a Spider run first if one hasn't been done. Takes longer than passive scanning since it's actively sending test payloads.
+
+### Real Example
+
+Active scan on a target surfaced a **High** alert: Remote OS Command Injection, with an example attack string of `127.0.0.1&cat /etc/passwd&` and evidence showing actual `/etc/passwd` contents in the response — Medium confidence but High risk, confirming exploitability directly in the alert details. Request could be replayed via ZAP HUD or Request Editor straight from the alert.
+
+### Reporting
+
+Report > Generate HTML Report (also supports XML, Markdown). Summarizes all findings by severity for later reference or client appendix material.
+
+### Pentesting Relevance
+- Ajax Spider matters increasingly given how many modern apps are SPA/JS-heavy — the standard Spider alone will miss AJAX-loaded routes
+- Passive alerts building up during normal Spider/browsing means useful findings show up "for free" before any active scanning starts
+- Being able to replay a scanner-found vulnerability directly (HUD/Request Editor) turns an automated finding into a manually-verified one in seconds
+- Fully free with no Pro tier — makes ZAP Scanner the default choice for engagements without a Burp Pro license
+
+---
+
+## Extensions
+
+Both tools support community-built extensions/add-ons — Burp via the **BApp Store**, ZAP via the **ZAP Marketplace**.
+
+### BApp Store (Burp)
+
+Extensions Tab > BApp Store. Sortable by popularity. Some extensions are Pro-only; most are free. Some require external dependencies (e.g. Jython) not installed by default.
+
+Notable extensions: Active Scan++, Decoder Improved, Autorize, Retire.JS, CSRF Scanner, JS Link Finder, Backslash Powered Scanner, PHP Object Injection Check, Java Deserialization Scanner, Wsdler, AWS Security Checks, CMS Scanner, and others covering specific tech stacks or vuln classes.
+
+### ZAP Marketplace
+
+Manage Add-ons > Marketplace tab. Add-ons are marked Release (stable) or Beta/Alpha (less stable). Example: installing **FuzzDB Files** and **FuzzDB Offensive** adds new wordlists to ZAP's fuzzer, including an OS Command Injection wordlist (`fuzzdb > attack > os-cmd-execution`) — directly useful for command injection fuzzing against WAF-protected targets.
+
+### Real Example
+
+Installed FuzzDB add-ons, then ran the ZAP Fuzzer against the `/ping` command injection target from earlier sections using the `command_execution-unix.txt` wordlist. Multiple payloads (`;id`, `` `id` ``, etc.) returned `200 OK`, confirming several viable injection syntaxes worked simultaneously — useful for finding a bypass when one payload syntax is filtered by a WAF.
+
+### Pentesting Relevance
+- Extensions turn Burp/ZAP from proxies into broader vulnerability-testing platforms without leaving the tool
+- FuzzDB-style wordlists targeting specific vuln classes (command injection, path traversal, etc.) are more effective than generic content-discovery wordlists for exploitation-focused fuzzing
+- Worth periodically reviewing the BApp Store/Marketplace for new releases — extension ecosystems update independently of the core tool
+
+---
+
+## Closing Thoughts
+
+Burp Suite and ZAP are core tools for web application penetration testing — essential not just for dedicated web testers but for offensive security practitioners generally, and useful for blue team/defensive work too. They belong in the same toolbox tier as Nmap, Hashcat, Wireshark, tcpdump, sqlmap, ffuf, and Gobuster. Practical fluency with both comes from working through real exercises and boxes, not just reading documentation.
+
+---
 
 ## Key Takeaways
 - Web proxies are MITM tools focused on HTTP/HTTPS traffic — not full packet sniffers
@@ -437,6 +653,10 @@ Ran `auxiliary/scanner/http/http_put` through Burp with `PROXIES` set — proxy 
 - A single unsanitized parameter passed into a system call is enough for full command injection
 - Response interception reveals hidden/disabled functionality gated only by the front end
 - Match and Replace / Replacer rules turn manual bypasses into persistent, automatic ones
-- Everything else in this module depends on proxy setup working correctly first
 - Request repeating (Burp Repeater / ZAP Request Editor) is the daily workflow for fast payload iteration — intercept once, repeat freely
 - Client-controlled state (e.g. `is_admin` in a base64 cookie) is a direct privilege escalation vector — always decode and inspect tokens/cookies
+- CLI tools and thick clients can be proxied too (proxychains, Metasploit's PROXIES flag) — not just browsers
+- Burp Intruder and ZAP Fuzzer both replicate CLI fuzzing tools inside the proxy — Community Intruder is throttled, ZAP Fuzzer isn't
+- Burp Scanner (Pro-only) and ZAP Scanner (free) both combine crawling with passive/active vulnerability detection — automating what was done manually earlier in the module
+- Extensions (BApp Store / ZAP Marketplace) extend both tools well beyond core proxy functionality — wordlists, scanners, decoders, and vuln-specific checks
+- Everything else in this module depends on proxy setup working correctly first
