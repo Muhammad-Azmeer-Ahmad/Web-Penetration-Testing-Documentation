@@ -14,7 +14,8 @@
 - [x] Subdomain Bruteforcing
 - [x] DNS Zone Transfers
 - [x] Virtual Hosts
-- [ ] (sections 10–19 to be added as covered)
+- [x] Certificate Transparency Logs
+- [ ] (sections 11–19 to be added as covered)
 
 ---
 
@@ -574,6 +575,64 @@ Result: `Found: forum.inlanefreight.htb:81 Status: 200 [Size: 100]` — a VHost 
 
 ---
 
+## Certificate Transparency Logs
+
+SSL/TLS certificates verify a website's identity and enable encrypted communication — but the issuance process isn't foolproof. Rogue or mis-issued certificates can be exploited to impersonate legitimate sites. **Certificate Transparency (CT) logs** exist to make certificate issuance publicly auditable.
+
+### What CT Logs Are
+
+Public, append-only ledgers recording every SSL/TLS certificate a Certificate Authority (CA) issues. CAs are required to submit new certificates to multiple independent CT logs, open for anyone to inspect.
+
+| Purpose | What It Enables |
+|---------|-------------------|
+| Early rogue certificate detection | Researchers/owners spot suspicious/misissued certs quickly, before abuse |
+| CA accountability | Rule-violating issuance is publicly visible, risking sanctions/loss of trust |
+| Strengthening Web PKI | Public oversight reinforces the trust system behind secure web communication |
+
+### Why CT Logs Matter for Recon
+
+Unlike brute-forcing, which is limited by wordlist coverage, CT logs give a **definitive historical record** of every certificate issued for a domain and its subdomains — including ones no longer active or hard to guess. Old/expired certificates can point to outdated, potentially vulnerable subdomains still running the software/config from when the cert was issued.
+
+### Search Tools
+
+| Tool | Features | Pros | Cons |
+|------|-----------|------|------|
+| crt.sh | Simple web UI, domain search, shows SAN entries | Free, no registration, easy | Limited filtering/analysis |
+| Censys | Powerful search engine for internet-connected devices/certs | Extensive filtering, API access | Requires registration (free tier available) |
+
+### crt.sh via API
+
+```bash
+curl -s "https://crt.sh/?q=facebook.com&output=json" | jq -r '.[] | select(.name_value | contains("dev")) | .name_value' | sort -u
+```
+
+```
+*.dev.facebook.com
+*.newdev.facebook.com
+*.secure.dev.facebook.com
+dev.facebook.com
+devvm1958.ftw3.facebook.com
+facebook-amex-dev.facebook.com
+facebook-amex-sign-enc-dev.facebook.com
+newdev.facebook.com
+secure.dev.facebook.com
+```
+
+| Part | Purpose |
+|------|---------|
+| `curl -s "https://crt.sh/?q=facebook.com&output=json"` | Pull JSON of all certs matching the domain |
+| `jq -r '.[] \| select(.name_value \| contains("dev")) \| .name_value'` | Filter to entries containing "dev", output raw strings |
+| `sort -u` | Alphabetize and dedupe results |
+
+### Pentesting Relevance
+- CT logs are the highest-signal passive subdomain source available — a comprehensive historical record, not a guess
+- Filtering by keyword (e.g. `dev`, `staging`, `internal`) via `jq` turns a noisy full cert list into a focused target list in one command
+- Expired/old certificates flag subdomains that may still be running outdated, unpatched software — worth checking even if the cert itself is dead
+- Wildcard certs (`*.dev.facebook.com`) confirm entire subdomain patterns exist even without enumerating every individual host
+- No wordlist dependency means CT logs catch naming conventions no wordlist would predict — internal codenames, employee names, project-specific subdomains
+
+---
+
 ## Key Takeaways
 - Web recon is the foundation of the Information Gathering phase — everything downstream depends on what's found here
 - Active recon = direct interaction, higher yield, higher detection risk
@@ -590,3 +649,4 @@ Result: `Found: forum.inlanefreight.htb:81 Status: 200 [Size: 100]` — a VHost 
 - Always attempt a DNS zone transfer (AXFR) against every discovered name server — low cost, occasionally reveals the entire subdomain/infra map at once
 - VHosts differ from subdomains in that they're defined by web server config, not DNS — many have no DNS record at all and require direct Host-header fuzzing to find
 - A discovered VHost with no DNS record is still reachable via a local hosts file entry pointing to the known IP
+- CT logs give a definitive historical subdomain record beyond wordlist coverage — `crt.sh` via `curl`/`jq` is a fast way to filter for specific naming patterns (dev, staging, etc.)
