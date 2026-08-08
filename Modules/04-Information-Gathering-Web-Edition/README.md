@@ -15,7 +15,10 @@
 - [x] DNS Zone Transfers
 - [x] Virtual Hosts
 - [x] Certificate Transparency Logs
-- [ ] (sections 11–19 to be added as covered)
+- [x] Fingerprinting
+- [x] Crawling
+- [x] robots.txt
+- [ ] (sections 14–19 to be added as covered)
 
 ---
 
@@ -633,6 +636,232 @@ secure.dev.facebook.com
 
 ---
 
+## Fingerprinting
+
+Extracting technical details about the technologies powering a target — server software, OS, frameworks, CMS. Same idea as a physical fingerprint: unique signatures that reveal exactly what's running underneath.
+
+### Why It Matters
+
+| Benefit | Why |
+|---------|-----|
+| Targeted Attacks | Focus on exploits known to affect the identified stack instead of guessing |
+| Identifying Misconfigurations | Surfaces outdated software, default settings, other weak points |
+| Prioritising Targets | Helps triage which of multiple targets is most likely vulnerable |
+| Comprehensive Profile | Combines with other recon findings into a full picture of the target's posture |
+
+### Techniques
+
+| Technique | What It Does |
+|-----------|----------------|
+| Banner Grabbing | Reads server/service banners for software + version |
+| HTTP Header Analysis | `Server`, `X-Powered-By` and similar headers disclose stack details |
+| Probing for Specific Responses | Crafted requests trigger unique responses/errors tied to specific software |
+| Page Content Analysis | Structure, scripts, copyright headers, etc. hint at underlying tech |
+
+### Tools
+
+| Tool | Notes |
+|------|-------|
+| Wappalyzer | Browser extension/online — broad tech identification (CMS, frameworks, analytics) |
+| BuiltWith | Detailed stack reports, free + paid tiers |
+| WhatWeb | CLI, large signature database |
+| Nmap | Service/OS fingerprinting, extensible via NSE scripts |
+| Netcraft | Tech + hosting + security posture reporting |
+| wafw00f | Dedicated WAF detection/identification |
+
+### Real Example — Fingerprinting inlanefreight.com
+
+**Banner grabbing with curl:**
+
+```bash
+curl -I inlanefreight.com
+```
+```
+HTTP/1.1 301 Moved Permanently
+Server: Apache/2.4.41 (Ubuntu)
+Location: https://inlanefreight.com/
+```
+
+Followed the redirect chain — each hop leaked more:
+
+```bash
+curl -I https://inlanefreight.com
+```
+```
+Server: Apache/2.4.41 (Ubuntu)
+X-Redirect-By: WordPress
+Location: https://www.inlanefreight.com/
+```
+
+```bash
+curl -I https://www.inlanefreight.com
+```
+```
+Server: Apache/2.4.41 (Ubuntu)
+Link: <https://www.inlanefreight.com/index.php/wp-json/>; rel="https://api.w.org/"
+```
+
+`X-Redirect-By: WordPress` and the `wp-json` path both confirm WordPress before ever loading the page.
+
+**WAF detection with wafw00f:**
+
+```bash
+wafw00f inlanefreight.com
+```
+```
+[+] The site https://inlanefreight.com is behind Wordfence (Defiant) WAF.
+```
+
+Confirms a WAF layer is present — relevant for planning around detection/filtering before further active recon.
+
+**Nikto scan (fingerprinting-only modules):**
+
+```bash
+nikto -h inlanefreight.com -Tuning b
+```
+
+Key findings from the scan:
+- Dual-stack IPs: IPv4 `134.209.24.248` and IPv6 `2a03:b0c0:1:e0::32c:b001`
+- `Apache/2.4.41 (Ubuntu)` confirmed — flagged as **outdated** (current at time was 2.4.59+)
+- Missing `Strict-Transport-Security` and `X-Content-Type-Options` headers
+- `Content-Encoding: deflate` — potential BREACH attack exposure
+- `license.txt` present — can help identify exact software/version
+- Confirmed WordPress installation, including `/wp-login.php`
+- `wordpress_test_cookie` created without the `httponly` flag
+
+### Pentesting Relevance
+- Redirect chains are worth following with `-I` at every hop — each one can leak a different header revealing different tech (Apache → WordPress → wp-json in this example)
+- WAF detection (wafw00f) should happen early — it changes how aggressively later active recon/exploitation can be attempted without getting blocked
+- Outdated software versions (Apache 2.4.41 vs current) are a direct lead toward known CVEs for that specific version
+- `wp-login.php` + `license.txt` + `wp-json` together confirm not just "WordPress" but give enough surface to pivot into WordPress-specific enumeration (plugins, themes, user enumeration)
+- Missing security headers (HSTS, X-Content-Type-Options) are low-severity findings individually but add up in a report and indicate general security hygiene
+- Combining passive (headers, page content) and active (Nikto, wafw00f) fingerprinting gives a much fuller picture than either alone
+
+---
+
+## Crawling
+
+Automated, systematic browsing of a target site — a crawler (spider) fetches a page, extracts every link, queues them, and repeats. Distinct from fuzzing: crawling only follows links that actually exist, it doesn't guess.
+
+### How It Works
+
+Starts from a **seed URL**, parses the page, extracts links, queues them, and recurses:
+
+```
+Homepage
+├── link1
+├── link2
+└── link3
+```
+
+Visiting `link1` reveals more links not visible from the homepage:
+
+```
+link1 Page
+├── Homepage
+├── link2
+├── link4
+└── link5
+```
+
+The crawler keeps expanding the queue as it discovers new pages, building a full map of everything reachable from the seed.
+
+### Crawling Strategies
+
+| Strategy | Behavior | Best For |
+|----------|----------|----------|
+| Breadth-First | Explores all links on the current level before going deeper | Broad overview of site structure early |
+| Depth-First | Follows one path as deep as possible before backtracking | Reaching specific/deeply nested content fast |
+
+Choice depends on the goal — breadth-first for mapping, depth-first for chasing a specific lead.
+
+### What Crawlers Extract
+
+| Data Type | Value |
+|-----------|-------|
+| Links (internal/external) | Maps site structure, finds hidden pages, reveals external relationships |
+| Comments | Users often leak internal process details, versions, or vulnerability hints unintentionally |
+| Metadata | Titles, descriptions, keywords, authors, dates — context on page purpose/relevance |
+| Sensitive Files | Backups (`.bak`, `.old`), configs (`web.config`, `settings.php`), logs (`error_log`, `access_log`) — potential credentials, API keys, source code |
+
+### The Importance of Context
+
+Individual findings are often unremarkable alone — value comes from connecting them. A pattern of URLs pointing to `/files/` is worth manually checking; if directory browsing is enabled there, it can expose backups and internal documents that no single link would have revealed in isolation. A stray comment mentioning a "file server" becomes meaningful once correlated with that same `/files/` discovery — together they reinforce that the file server is likely publicly exposed.
+
+### Pentesting Relevance
+- Crawling only finds what's linked — always pair with fuzzing/brute-forcing (Section 5-7 techniques) to catch unlinked pages a crawler alone would miss
+- Directory listing exposure (like `/files/`) found through crawled link patterns is a consistently high-value finding — often exposes backups/configs directly
+- Comments and metadata are easy to overlook individually but valuable in aggregate — worth extracting systematically rather than skimming manually
+- Backup/config file extensions (`.bak`, `.old`, `web.config`) are worth actively hunting for during a crawl — a common and severe misconfiguration
+- Treat crawl output as a dataset to correlate, not a checklist to read top-to-bottom — the real findings emerge from cross-referencing links, comments, and metadata together
+
+---
+
+## robots.txt
+
+A plain text file in a site's root (`www.example.com/robots.txt`) following the Robots Exclusion Standard — tells crawlers which paths they're allowed or not allowed to access. Voluntary, not enforced — legitimate bots respect it, nothing technically stops a rogue one from ignoring it.
+
+### Structure
+
+Each record = a `User-agent` line + one or more directives, separated by blank lines.
+
+```
+User-agent: *
+Disallow: /private/
+```
+
+`*` = applies to all bots; specific agents can be targeted too (`Googlebot`, `Bingbot`, etc.).
+
+### Common Directives
+
+| Directive | Purpose | Example |
+|-----------|---------|---------|
+| Disallow | Paths the bot should not crawl | `Disallow: /admin/` |
+| Allow | Explicitly permits a path, even under a broader Disallow | `Allow: /public/` |
+| Crawl-delay | Seconds between requests, avoids overloading the server | `Crawl-delay: 10` |
+| Sitemap | Points to the XML sitemap for efficient crawling | `Sitemap: https://www.example.com/sitemap.xml` |
+
+### Why It Exists
+
+| Reason | Purpose |
+|--------|---------|
+| Avoiding Overburdening Servers | Limits crawl traffic on sensitive/heavy paths |
+| Protecting Sensitive Info | Keeps private content out of search engine indexes |
+| Legal/Ethical Compliance | Ignoring it can breach ToS or, in some cases, legal boundaries |
+
+### Value for Recon
+
+| Use | What It Reveals |
+|-----|-------------------|
+| Uncovering Hidden Directories | `Disallow` entries often point directly at admin panels, backups, or other content the owner wants hidden from search engines |
+| Mapping Website Structure | Allowed/disallowed paths sketch out a rough site map, including unlinked sections |
+| Detecting Crawler Traps | Some disallowed paths are intentional honeypots for malicious bots — spotting them signals a security-aware target |
+
+### Real Example
+
+```
+User-agent: *
+Disallow: /admin/
+Disallow: /private/
+Allow: /public/
+
+User-agent: Googlebot
+Crawl-delay: 10
+
+Sitemap: https://www.example.com/sitemap.xml
+```
+
+Directly implies an admin panel at `/admin/` and private content at `/private/` — both paths the site owner is explicitly trying to keep out of search engine indexes, and both worth checking manually.
+
+### Pentesting Relevance
+- `robots.txt` is one of the first things worth checking on any target — zero cost, often points straight at the exact paths worth investigating further
+- `Disallow` entries are effectively the site owner telling you where the interesting stuff is — treat them as a target list, not a boundary
+- The file is fully public and requires no interaction risk to fetch — pure passive recon with immediate payoff
+- Crawler traps in `Disallow` are a signal the target is security-conscious — worth factoring into how carefully the rest of the engagement is approached
+- Cross-reference disallowed paths against crawl/fuzzing results from earlier sections — a path appearing in both robots.txt and a directory brute-force hit is a strong signal it's real and worth prioritizing
+
+---
+
 ## Key Takeaways
 - Web recon is the foundation of the Information Gathering phase — everything downstream depends on what's found here
 - Active recon = direct interaction, higher yield, higher detection risk
@@ -650,3 +879,6 @@ secure.dev.facebook.com
 - VHosts differ from subdomains in that they're defined by web server config, not DNS — many have no DNS record at all and require direct Host-header fuzzing to find
 - A discovered VHost with no DNS record is still reachable via a local hosts file entry pointing to the known IP
 - CT logs give a definitive historical subdomain record beyond wordlist coverage — `crt.sh` via `curl`/`jq` is a fast way to filter for specific naming patterns (dev, staging, etc.)
+- Fingerprinting via headers/redirects/Nikto/wafw00f builds a stack profile fast — outdated versions and confirmed CMS (e.g. WordPress) are direct leads into targeted exploitation
+- Crawling only finds linked content — always pair with active fuzzing to catch unlinked pages; value comes from correlating links, comments, and metadata together, not reading them in isolation
+- robots.txt Disallow entries are effectively a free target list from the site owner — always check it first, zero cost, often points straight at admin panels or private paths
