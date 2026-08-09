@@ -1,6 +1,6 @@
 # Module 04 — Information Gathering - Web Edition
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
 ![Category](https://img.shields.io/badge/Category-Offensive-orange)
 
@@ -23,12 +23,13 @@
 - [x] Search Engine Discovery
 - [x] Web Archives
 - [x] Automating Recon
-- [ ] Section 19 (final section)
 
 ---
 
 ## What This Module Is About
 Web reconnaissance — systematically collecting information about a target website/application before deeper analysis or exploitation. Sits inside the Information Gathering phase of the penetration testing process (Pre-Engagement → Information Gathering → Vulnerability Assessment → Exploitation → Post-Exploitation → Lateral Movement → Proof-of-Concept → Post-Engagement).
+
+Covers the full passive-to-active recon pipeline: WHOIS/DNS/subdomain discovery → virtual hosts and certificate transparency → fingerprinting and crawling → robots.txt/well-known URIs → search engines and web archives → automation frameworks that chain all of the above together.
 
 ---
 
@@ -1154,6 +1155,12 @@ Output confirmed `Apache/2.4.41 (Ubuntu)`, the `wp-json` link (WordPress confirm
 - Automated tools are a starting point, not a replacement for manual verification — always confirm automated findings (e.g. a flagged subdomain or exposed file) by hand before relying on them
 - Exported output (`-o`, dump files) is useful for building a persistent recon record across a long engagement, rather than re-running scans from scratch
 - Combining multiple frameworks (FinalRecon + theHarvester + Recon-ng) covers gaps any single tool misses — no one framework is comprehensive on its own
+
+---
+
+## Closing Thoughts
+
+Recon is where an engagement is won or lost before a single exploit gets attempted — nearly every later technique in this path (SQLi, XSS, auth bypass, file inclusion) needs a target, endpoint, or piece of context that comes from here. The discipline that matters most isn't any single tool but the sequencing: passive before active, broad before targeted, and always cross-referencing findings across techniques (a subdomain in CT logs, confirmed live in a Wayback snapshot, brute-forced again in DNS enum) rather than trusting any one source in isolation.
 
 ---
 
