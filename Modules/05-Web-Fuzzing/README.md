@@ -9,7 +9,8 @@
 - [ ] Section 2 (skipped)
 - [x] Directory and File Fuzzing
 - [x] Recursive Fuzzing
-- [ ] (sections 5-12 to be added as covered)
+- [x] Parameter and Value Fuzzing
+- [ ] (sections 6-12 to be added as covered)
 
 ---
 
@@ -215,6 +216,116 @@ ffuf -w /usr/share/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-
 
 ---
 
+## Parameter and Value Fuzzing
+
+Beyond directories/files — manipulating request parameters and their values to see how the app processes input. Parameters are the variables carrying data between browser and server.
+
+### GET Parameters
+
+Visible directly in the URL after `?`, chained with `&`:
+
+```
+https://example.com/search?query=fuzzing&category=security
+```
+
+`query=fuzzing`, `category=security` — both openly visible, like a postcard. Typically used for actions that don't change server state (search, filter).
+
+### POST Parameters
+
+Carried in the request body, not the URL — used for sensitive data (credentials, personal/financial info).
+
+**Encoding formats:**
+
+| Format | Use Case |
+|--------|----------|
+| `application/x-www-form-urlencoded` | Key-value pairs joined by `&`, same shape as GET params but in the body |
+| `multipart/form-data` | Used when submitting files alongside other data |
+
+Example login POST request:
+
+```http
+POST /login HTTP/1.1
+Host: example.com
+Content-Type: application/x-www-form-urlencoded
+
+username=your_username&password=your_password
+```
+
+### Why Parameters Matter for Fuzzing
+
+| Attack | Example |
+|--------|---------|
+| Altered product ID | Pricing errors, unauthorized access to other users' orders |
+| Modified hidden parameter | Unlocks hidden features/admin functions |
+| Injected malicious code in a param | XSS, SQL injection |
+
+### Fuzzing GET Parameters with wenum
+
+Install:
+```bash
+pipx install git+https://github.com/WebFuzzForge/wenum
+pipx runpip wenum install setuptools
+```
+
+**Manual probing first** — always worth doing before automating:
+
+```bash
+curl http://IP:PORT/get.php
+# Invalid parameter value / x:
+
+curl http://IP:PORT/get.php?x=1
+# Invalid parameter value / x: 1
+```
+
+Confirms the app validates `x` and returns different behavior based on its value — a fuzzing target.
+
+**Automated fuzzing:**
+
+```bash
+wenum -w /usr/share/seclists/Discovery/Web-Content/common.txt --hc 404 -u "http://IP:PORT/get.php?x=FUZZ"
+```
+
+| Flag | Purpose |
+|------|---------|
+| `-w` | Wordlist path |
+| `--hc 404` | Hide 404 responses — wenum logs every request by default |
+| `?x=FUZZ` | Insertion point for wordlist values |
+
+Result: one line stood out with `200` instead of the usual invalid-value response — that value was the correct one, confirmed by requesting it directly and retrieving the flag.
+
+### Fuzzing POST Parameters with ffuf
+
+Different mechanism — payload goes in the request body, not the URL.
+
+**Manual probe:**
+```bash
+curl -d "" http://IP:PORT/post.php
+# Invalid parameter value / y:
+```
+
+**Automated fuzzing:**
+```bash
+ffuf -u http://IP:PORT/post.php -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "y=FUZZ" -w /usr/share/seclists/Discovery/Web-Content/common.txt -mc 200 -v
+```
+
+| Flag | Purpose |
+|------|---------|
+| `-X POST` | Set HTTP method |
+| `-H` | Set request header (content type) |
+| `-d "y=FUZZ"` | POST body with the fuzz insertion point |
+| `-mc 200` | Only match responses with status 200 |
+
+Result: one value returned `200` where all others returned the invalid-parameter message — confirmed with a direct `curl -d "y=<value>"` request, returning the flag.
+
+### Pentesting Relevance
+- Manual probing before fuzzing (checking how the app responds to missing/wrong values) confirms there's actually a validation mechanism worth automating against — don't fuzz blind
+- GET vs POST fuzzing require different tooling mechanics (`-u` URL substitution vs `-d` body substitution) — know which applies before building the command
+- `--hc`/`-mc` (hide/match status codes) is the essential filtering step — without it, results are buried in thousands of "invalid" responses
+- Product IDs, hidden params, and search/query fields are the highest-value targets for this technique — direct paths to IDOR, auth bypass, and injection vulnerabilities
+- In real engagements (unlike this flag-based exercise), correct values won't be obviously flagged — response size, timing, and subtle content differences become the actual signal to watch for
+
+---
+
 ## Key Takeaways
 - Web fuzzing automates testing with unexpected/malformed input to surface vulnerabilities manual testing misses
 - Fuzzing (wide net, unexpected input) and brute-forcing (targeted guessing) are related but distinct techniques
@@ -223,3 +334,4 @@ ffuf -w /usr/share/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-
 - Defining a tight Fuzzing Scope keeps testing efficient and reduces unnecessary detection risk
 - Directory fuzzing before file fuzzing is the right sequence — find the folder, then dig inside it; `.bak`/leftover-extension files are consistently high-value finds since they bypass normal app access controls
 - Recursive fuzzing automates nested directory discovery — always cap it with `-recursion-depth` and throttle with `-rate` to avoid overwhelming the target
+- Parameter fuzzing (GET via URL, POST via request body) targets the app's actual input validation logic — product IDs, hidden params, and search fields are the highest-value spots to test
