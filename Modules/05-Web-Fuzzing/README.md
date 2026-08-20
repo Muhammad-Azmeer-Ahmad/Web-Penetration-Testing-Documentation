@@ -1,6 +1,6 @@
 # Module 05 — Web Fuzzing
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-HackTheBox-red)
 ![Category](https://img.shields.io/badge/Category-Offensive-orange)
 
@@ -10,7 +10,13 @@
 - [x] Directory and File Fuzzing
 - [x] Recursive Fuzzing
 - [x] Parameter and Value Fuzzing
-- [ ] (sections 6-12 to be added as covered)
+- [x] Virtual Host and Subdomain Fuzzing
+- [x] Filtering Fuzzing Output
+- [x] Validating Findings
+- [x] Web APIs
+- [x] Identifying Endpoints
+- [x] API Fuzzing
+- [~] Skills Assessment (Section 12 — practical exercise, not documented)
 
 ---
 
@@ -326,6 +332,367 @@ Result: one value returned `200` where all others returned the invalid-parameter
 
 ---
 
+## Virtual Host and Subdomain Fuzzing
+
+Both vhosts and subdomains organize web content, but work through completely different mechanisms — worth fuzzing both.
+
+| | Virtual Hosts | Subdomains |
+|--|----------------|------------|
+| Identified by | `Host` header in HTTP requests | DNS records pointing to an IP |
+| Purpose | Multiple sites on one server | Organizing sections/services of a site |
+| Security Risk | Misconfigured vhosts can expose internal apps | Subdomain takeover if DNS records are mismanaged |
+
+### gobuster
+
+Multi-purpose brute-forcer: directories, files, subdomains, and vhosts all in one tool.
+
+**VHost fuzzing:**
+
+```bash
+echo "IP inlanefreight.htb" | sudo tee -a /etc/hosts
+gobuster vhost -u http://inlanefreight.htb:81 -w /usr/share/seclists/Discovery/Web-Content/common.txt --append-domain
+```
+
+`--append-domain` appends the base domain to each wordlist word, ensuring the `Host` header sent is a complete domain (e.g. `admin.inlanefreight.htb`) — essential for the fuzzing to actually work correctly.
+
+Real example result: `Found: admin.inlanefreight.htb:81 Status: 200 [Size: 100]` — a live, previously undocumented vhost.
+
+**Subdomain (DNS) fuzzing:**
+
+```bash
+gobuster dns -d inlanefreight.com -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt
+```
+
+Generates candidate subdomains from the wordlist, appends to the target domain, and attempts DNS resolution — a resolved subdomain is valid and gets reported.
+
+Note: in newer Gobuster releases, `-d` sets request delay, not domain — use `--do`/`--domain` instead for the target domain.
+
+### Pentesting Relevance
+- VHost fuzzing catches internal/undocumented sites sharing an IP that DNS enumeration alone would never surface — the two techniques cover different blind spots
+- `--append-domain` is easy to forget and silently breaks results — always double-check the Host header being sent matches expectations
+- Command syntax drift between Gobuster versions (`-d` meaning changes) is a real trap — verify flag meaning against the installed version before relying on old command references
+
+---
+
+## Filtering Fuzzing Output
+
+Fuzzers generate huge volumes of output — filtering is what turns raw noise into actionable findings.
+
+### Gobuster
+
+| Flag | Purpose |
+|------|---------|
+| `-s` (include) | Only show specified status codes (dir mode only) |
+| `-b` (exclude) | Hide specified status codes (dir mode only) |
+| `--exclude-length` | Hide responses of specific content lengths |
+
+```bash
+gobuster dir -u http://example.com/ -w wordlist.txt -s 200,301 --exclude-length 0
+```
+
+### ffuf
+
+| Flag | Purpose |
+|------|---------|
+| `-mc` / `-fc` | Match / filter status code(s) — default match: `200-299,301,302,307,401,403,405,500` |
+| `-ms` / `-fs` | Match / filter response size |
+| `-mw` / `-fw` | Match / filter word count |
+| `-ml` / `-fl` | Match / filter line count |
+| `-mt` | Match by time-to-first-byte (e.g. `>500` for slow responses) |
+
+```bash
+# Status 200, specific word count, size over 500 bytes
+ffuf -u http://example.com/FUZZ -w wordlist.txt -mc 200 -fw 427 -ms >500
+
+# Exclude common noise codes
+ffuf -u http://example.com/FUZZ -w wordlist.txt -fc 404,401,302
+```
+
+### wenum
+
+| Flag | Purpose |
+|------|---------|
+| `--hc` / `--sc` | Hide / show status code(s) |
+| `--hl` / `--sl` | Hide / show by line count |
+| `--hw` / `--sw` | Hide / show by word count |
+| `--hs` / `--ss` | Hide / show by response size |
+| `--hr` / `--sr` | Hide / show by regex match on response body |
+| `--filter` / `--hard-filter` | General show/hide by regex; hard-filter also blocks post-processing |
+
+```bash
+wenum -w wordlist.txt --sr "admin\|password" -u https://example.com/FUZZ
+```
+
+### Feroxbuster
+
+| Flag | Purpose |
+|------|---------|
+| `--dont-scan` | Exclude specific paths from scanning (even via recursion) |
+| `-S` / `--filter-size` | Exclude by response size |
+| `-X` / `--filter-regex` | Exclude by regex match |
+| `-W` / `--filter-words` | Exclude by word count |
+| `-N` / `--filter-lines` | Exclude by line count |
+| `-C` / `--filter-status` | Denylist status codes |
+| `-s` / `--status-codes` | Allowlist status codes |
+| `--filter-similar-to` | Exclude pages similar to a reference page |
+
+```bash
+feroxbuster --url http://example.com -w wordlist.txt -s 200 -S 10240 -X "error"
+```
+
+### Real Example — Why Filtering Matters
+
+Removing ffuf's default match filter (`-mc all` instead of the implicit default) on the same POST fuzzing command from earlier flooded the output with hundreds of `404` results, burying anything meaningful. The default matcher (`200-299,301,302,307,401,403,405,500`) exists specifically to suppress that noise automatically.
+
+### Pentesting Relevance
+- Every fuzzer defaults to *some* filtering already — know what's implicit before assuming raw output is unfiltered
+- Combine filters (status + size + word count) rather than relying on just one — a single filter dimension is easy to accidentally match/exclude the wrong thing
+- Regex-based filtering (`-sr`/`-hr`, `-X`) is the most powerful option when status codes alone don't distinguish real findings from noise (e.g. a `200` error page vs a `200` real page)
+- Filtering choice should be revisited per-target — defaults tuned for one app's error page pattern won't necessarily fit another
+
+---
+
+## Validating Findings
+
+Fuzzing generates leads, not confirmed vulnerabilities. False positives are expected — validation is a required step, not optional polish.
+
+### Why Validate
+
+| Purpose | Value |
+|---------|-------|
+| Confirming Vulnerabilities | Separates real issues from fuzzer noise |
+| Understanding Impact | Establishes severity |
+| Reproducing the Issue | Enables consistent replication for fix/mitigation work |
+| Gathering Evidence | Builds proof to present to developers/stakeholders |
+
+### Manual Verification Process
+
+1. **Reproduce the request** — curl or browser, same request that triggered the anomaly
+2. **Analyze the response** — look for errors, unexpected content, deviation from normal behavior
+3. **Exploitation (cautious, authorized only)** — build a harmless proof-of-concept, not a full exploit; e.g. a SQLi PoC that returns the DB version string rather than exfiltrating data
+
+Goal: enough evidence to convince stakeholders, without causing harm or exceeding authorization.
+
+### Real Example — Validating a Backup Directory
+
+Fuzzer found `/backup/` returning `200`. Rather than immediately browsing it (which could expose sensitive file contents unnecessarily), validate responsibly:
+
+```bash
+curl http://IP:PORT/backup/
+```
+
+Directory listing confirms the directory is browsable — response includes an actual file listing (`backup.sql`, etc.).
+
+**Safer alternative — headers only:**
+
+```bash
+curl -I http://IP:PORT/backup/password.txt
+```
+```
+HTTP/1.1 200 OK
+Content-Type: text/plain;charset=utf-8
+Content-Length: 171
+```
+
+`Content-Type` confirms file type without reading contents; `Content-Length: 171` confirms the file has real data (not empty) — enough evidence of a real exposure without touching the actual sensitive content.
+
+### Pentesting Relevance
+- Headers-only validation (`curl -I`) is the responsible default for anything that might contain sensitive data — confirms existence/non-empty status without exfiltrating content
+- A non-zero `Content-Length` on a suspiciously-named file (`password.txt`, `dump.sql`) is strong evidence on its own — full content isn't always necessary to prove the finding
+- Building a harmless PoC (DB version string instead of data dump) is the difference between responsible disclosure and actual data exposure — always minimize impact while proving impact
+- Every fuzzer hit needs this validation step before being written up — an unvalidated finding in a report undermines credibility if it turns out to be a false positive
+
+---
+
+## Web APIs
+
+APIs let different software communicate over the web — a bridge between server (data/functionality) and client (browser, app, another server).
+
+### Three Common API Styles
+
+| Style | Model | Data Format | Example |
+|-------|-------|--------------|---------|
+| REST | Stateless, resource-based URLs, standard HTTP methods (GET/POST/PUT/DELETE) | JSON/XML | `GET /users/123` |
+| SOAP | Formal XML-based protocol, built-in security/reliability/transactions | XML (SOAP envelope) | `<soapenv:Envelope>...<GetStockPrice>...` |
+| GraphQL | Single endpoint, client specifies exactly what data it wants | JSON | `query { user(id: 123) { name email } }` |
+
+### Why APIs Matter
+
+Enable code reuse, third-party integrations (payments, social logins, maps), and underpin microservices architecture — breaking monoliths into independently communicating services.
+
+### Web Server vs API
+
+| Feature | Web Server | API |
+|---------|-----------|-----|
+| Purpose | Serves static/dynamic pages | Enables app-to-app communication |
+| Protocol | HTTP | HTTP, HTTPS, SOAP, others |
+| Data Format | HTML/CSS/JS | JSON, XML, others |
+| User Interaction | Direct (browser) | Indirect — apps consume it on the user's behalf |
+| Access | Usually public | Public, private, or partner-restricted |
+
+### Pentesting Relevance
+- Knowing which API style is in play (REST/SOAP/GraphQL) determines fuzzing approach entirely — REST needs endpoint/param discovery, GraphQL needs schema introspection, SOAP needs WSDL analysis
+- APIs are frequently less hardened than the public-facing web app since they're assumed to be "internal" or consumed only by trusted clients — a flawed but common assumption
+- Data format matters for payload construction — JSON injection differs from XML injection differs from GraphQL query manipulation
+- Microservices architecture means one API compromise can be a pivot point into other internal services communicating with it
+
+---
+
+## Identifying Endpoints
+
+Before fuzzing an API, you need to know what to fuzz — endpoint discovery comes first.
+
+### REST
+
+Resources identified by URLs (endpoints), often hierarchical:
+
+```
+/users        → collection
+/users/123    → specific resource
+/products/456 → specific resource
+```
+
+| Parameter Type | Location | Example |
+|-----------------|----------|---------|
+| Query | After `?` in URL | `/users?limit=10&sort=name` |
+| Path | Embedded in the URL | `/products/{id}` |
+| Request Body | POST/PUT/PATCH body | `{"name": "New Product", "price": 99.99}` |
+
+**Discovery methods:**
+- **API documentation** — Swagger/OpenAPI, RAML — most reliable source when available
+- **Network traffic analysis** — Burp/browser devtools intercepting real requests
+- **Parameter name fuzzing** — same tools/technique as directory fuzzing, applied to param names instead
+
+### SOAP
+
+Single endpoint for all operations — the SOAP message body (XML) determines the specific action.
+
+Structure defined by a **WSDL** file (operations, parameters, data types, response formats, endpoint location).
+
+```xml
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:lib="http://example.com/library">
+   <soapenv:Body>
+      <lib:SearchBooks>
+         <lib:keywords>cybersecurity</lib:keywords>
+         <lib:author>Dan Kaminsky</lib:author>
+      </lib:SearchBooks>
+   </soapenv:Body>
+</soapenv:Envelope>
+```
+
+**Discovery methods:** WSDL analysis (primary source), network traffic analysis (Wireshark/tcpdump), fuzzing for undocumented operations/parameters.
+
+### GraphQL
+
+Single endpoint (typically `/graphql`) for everything — queries (read) and mutations (write).
+
+| Component | Purpose | Example |
+|-----------|---------|---------|
+| Field | Specific data point | `name`, `email` |
+| Relationship | Connection to related data | `posts` |
+| Nested Object | Traverse deeper into the graph | `posts { title, body }` |
+| Argument | Refine query behavior | `posts(limit: 5)` |
+
+```graphql
+query {
+  user(id: 123) {
+    name
+    posts(limit: 5) { title body }
+  }
+}
+```
+
+Mutations follow the same pattern for create/update/delete:
+
+```graphql
+mutation {
+  createPost(title: "New Post", body: "content") {
+    id
+    title
+  }
+}
+```
+
+**Discovery methods:**
+- **Introspection** — a special query retrieves the entire schema (types, fields, queries, mutations, arguments) directly from the API
+- **Documentation/tooling** — GraphiQL, GraphQL Playground for interactive schema exploration
+- **Network traffic analysis** — same principle as REST/SOAP
+
+### Pentesting Relevance
+- Introspection is the single most valuable GraphQL recon technique — a misconfigured API leaving introspection enabled in production hands over the entire schema for free
+- WSDL files are effectively SOAP's documentation — always check for one before manually fuzzing blind
+- Parameter name fuzzing matters most when documentation is absent/incomplete — the same directory-fuzzing mindset applies directly to undocumented API parameters
+- Network traffic analysis is the universal fallback across all three API styles when docs don't exist — intercepting real traffic reveals real usage patterns
+
+---
+
+## API Fuzzing
+
+Applying fuzzing principles specifically to API structure and protocols — altering param values, headers, param order, and data types to trigger errors or unexpected behavior.
+
+### Why Fuzz APIs
+
+| Reason | Value |
+|--------|-------|
+| Uncovering Hidden Vulnerabilities | Undocumented endpoints/params are common and under-tested |
+| Testing Robustness | Confirms the API handles malformed input gracefully instead of crashing/leaking data |
+| Automating Security Testing | Manual testing of every input combination isn't feasible |
+| Simulating Real-World Attacks | Mimics actual attacker behavior proactively |
+
+### Three Types of API Fuzzing
+
+| Type | Target | Reveals |
+|------|--------|---------|
+| Parameter Fuzzing | Query params, headers, request bodies | SQLi, command injection, XSS, parameter tampering |
+| Data Format Fuzzing | JSON/XML structure, encoding | Parsing errors, buffer overflows, special-character handling flaws |
+| Sequence Fuzzing | Order/timing of multi-endpoint request chains | Race conditions, IDOR, authorization bypasses |
+
+### Real Example — Discovering an Undocumented Endpoint
+
+Target API documented 5 endpoints via Swagger (`/docs`): root, get/update/delete/create item. Ran a dedicated API fuzzer against it:
+
+```bash
+git clone https://github.com/PandaSt0rm/webfuzz_api.git
+cd webfuzz_api
+pip3 install -r requirements.txt
+python3 api_fuzzer.py http://IP:PORT
+```
+
+Result: 4727 `404`s (expected noise), but 2 valid hits — the documented `/docs`, and an **undocumented** endpoint. A `405` on `/items` also flagged, indicating a request using the wrong HTTP method (worth retrying with the correct one).
+
+```bash
+curl http://localhost:8000/cz...
+# {"flag":"<snip>"}
+```
+
+The undocumented endpoint returned the flag directly — confirming hidden endpoints found via fuzzing can carry real functionality/data that public documentation never revealed.
+
+### Beyond Endpoint Discovery — Parameter-Level Fuzzing
+
+Once endpoints are known, fuzzing their parameters can surface:
+
+| Vulnerability | How Fuzzing Reveals It |
+|----------------|---------------------------|
+| Broken Object-Level Authorization (BOLA) | Manipulated param values grant access to objects that shouldn't be accessible |
+| Broken Function-Level Authorization | Manipulated params trigger functions the caller shouldn't be authorized for |
+| SSRF | Malicious param values trick the server into making unintended internal/external requests |
+
+Full exploitation of these is covered in the API Attacks module.
+
+### Pentesting Relevance
+- Undocumented endpoints are one of the highest-value findings in API testing — they're untested by definition, often missing the validation/auth checks applied to documented ones
+- A `405 Method Not Allowed` is a signal, not a dead end — it confirms the endpoint exists and expects a specific method worth identifying (try the other CRUD verbs)
+- Sequence fuzzing matters especially for stateful APIs (checkout flows, multi-step auth) — single-request fuzzing alone won't catch race conditions or ordering-dependent bugs
+- BOLA/SSRF risks mean parameter fuzzing on APIs isn't just about crashing the app — it's a direct path to unauthorized data access or internal network pivoting
+
+---
+
+## Closing Thoughts
+
+Fuzzing is where Module 04's recon becomes actionable — every subdomain, endpoint, and parameter discovered there is exactly what gets fed into ffuf, gobuster, or an API fuzzer here. The technique scales from simple directory guessing to full API schema exploitation, but the discipline stays constant throughout: filter aggressively to cut noise, validate every hit before trusting it, and match the fuzzing approach to the target's actual structure (web app vs REST vs SOAP vs GraphQL) rather than treating everything as a generic directory brute-force. Response Analysis — not the fuzzer itself — is the real skill this module builds.
+
+---
+
 ## Key Takeaways
 - Web fuzzing automates testing with unexpected/malformed input to surface vulnerabilities manual testing misses
 - Fuzzing (wide net, unexpected input) and brute-forcing (targeted guessing) are related but distinct techniques
@@ -335,3 +702,9 @@ Result: one value returned `200` where all others returned the invalid-parameter
 - Directory fuzzing before file fuzzing is the right sequence — find the folder, then dig inside it; `.bak`/leftover-extension files are consistently high-value finds since they bypass normal app access controls
 - Recursive fuzzing automates nested directory discovery — always cap it with `-recursion-depth` and throttle with `-rate` to avoid overwhelming the target
 - Parameter fuzzing (GET via URL, POST via request body) targets the app's actual input validation logic — product IDs, hidden params, and search fields are the highest-value spots to test
+- VHost fuzzing and subdomain/DNS fuzzing cover different blind spots — always run both, since VHosts can exist with zero DNS footprint
+- Every fuzzer applies some default filtering already — know the implicit matcher before assuming raw output is unfiltered, and combine filter dimensions (status + size + word count) for precision
+- Fuzzer hits are leads, not confirmed vulnerabilities — always validate manually (headers-first, minimal-impact PoC) before reporting a finding
+- API style (REST/SOAP/GraphQL) determines the fuzzing approach entirely — endpoint discovery must come before parameter fuzzing, and GraphQL introspection left enabled is a direct schema leak
+- Undocumented API endpoints are consistently high-value — untested by definition, often missing the auth/validation checks applied to documented ones
+- API-specific fuzzing (parameter, data format, sequence) targets vulnerability classes standard web fuzzing misses entirely — BOLA, SSRF, and race conditions require this specialized approach
